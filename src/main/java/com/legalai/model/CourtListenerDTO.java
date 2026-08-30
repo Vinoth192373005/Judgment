@@ -12,6 +12,9 @@ public class CourtListenerDTO {
 
     private Long id;
 
+    @JsonProperty("cluster_id")
+    private Long clusterId;
+
     @JsonProperty("caseName")
     private String caseName;
 
@@ -45,6 +48,9 @@ public class CourtListenerDTO {
     @JsonProperty("snippet")
     private String snippet;
 
+    @JsonProperty("opinions")
+    private List<OpinionSnippetDTO> opinions;
+
     @JsonProperty("absolute_url")
     private String absoluteUrl;
 
@@ -52,15 +58,23 @@ public class CourtListenerDTO {
     }
 
     public Long getId() {
-        return id;
+        return id != null ? id : clusterId;
     }
 
     public void setId(Long id) {
         this.id = id;
     }
 
+    public Long getClusterId() {
+        return clusterId;
+    }
+
+    public void setClusterId(Long clusterId) {
+        this.clusterId = clusterId;
+    }
+
     public String getCaseName() {
-        return caseName;
+        return (caseName != null && !caseName.isBlank()) ? caseName : caseNameFull;
     }
 
     public void setCaseName(String caseName) {
@@ -140,11 +154,25 @@ public class CourtListenerDTO {
     }
 
     public String getSnippet() {
-        return snippet;
+        if (snippet != null && !snippet.isBlank()) {
+            return snippet;
+        }
+        if (opinions != null && !opinions.isEmpty() && opinions.get(0).getSnippet() != null) {
+            return opinions.get(0).getSnippet();
+        }
+        return "";
     }
 
     public void setSnippet(String snippet) {
         this.snippet = snippet;
+    }
+
+    public List<OpinionSnippetDTO> getOpinions() {
+        return opinions;
+    }
+
+    public void setOpinions(List<OpinionSnippetDTO> opinions) {
+        this.opinions = opinions;
     }
 
     public String getAbsoluteUrl() {
@@ -153,5 +181,19 @@ public class CourtListenerDTO {
 
     public void setAbsoluteUrl(String absoluteUrl) {
         this.absoluteUrl = absoluteUrl;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class OpinionSnippetDTO {
+        @JsonProperty("snippet")
+        private String snippet;
+
+        public String getSnippet() {
+            return snippet;
+        }
+
+        public void setSnippet(String snippet) {
+            this.snippet = snippet;
+        }
     }
 }

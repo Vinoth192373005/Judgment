@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
 import java.time.LocalDate;
 import java.util.Collections;
 
@@ -45,15 +46,16 @@ public class CourtListenerService {
      */
     public CourtListenerSearchResponse searchOpinions(String query, int page) {
         try {
-            UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(COURTLISTENER_SEARCH_URL)
+            URI targetUri = UriComponentsBuilder.fromHttpUrl(COURTLISTENER_SEARCH_URL)
                     .queryParam("q", query)
                     .queryParam("type", "o")
-                    .queryParam("order_by", "score desc")
-                    .queryParam("page", Math.max(1, page));
+                    .queryParam("page", Math.max(1, page))
+                    .build()
+                    .toUri();
 
             HttpHeaders headers = new HttpHeaders();
             headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
-            headers.set("User-Agent", "Judgment-AI-Legal-Platform/1.0 (contact@judgment.ai)");
+            headers.set("User-Agent", "Judgment-AI-Legal-Platform/1.0");
 
             if (apiToken != null && !apiToken.isBlank()) {
                 headers.set("Authorization", "Token " + apiToken.trim());
@@ -61,17 +63,18 @@ public class CourtListenerService {
 
             HttpEntity<Void> entity = new HttpEntity<>(headers);
             ResponseEntity<CourtListenerSearchResponse> response = restTemplate.exchange(
-                    builder.toUriString(),
+                    targetUri,
                     HttpMethod.GET,
                     entity,
                     CourtListenerSearchResponse.class
             );
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                log.info("CourtListener API query '{}' returned {} results", query, response.getBody().getResults() != null ? response.getBody().getResults().size() : 0);
                 return response.getBody();
             }
         } catch (Exception e) {
-            log.error("CourtListener API query failed for '{}': {}", query, e.getMessage());
+            log.error("CourtListener API query failed for '{}': {}", query, e.getMessage(), e);
         }
 
         CourtListenerSearchResponse empty = new CourtListenerSearchResponse();
@@ -92,7 +95,7 @@ public class CourtListenerService {
 
         String docket = (dto.getDocketNumber() != null && !dto.getDocketNumber().isBlank())
                 ? dto.getDocketNumber()
-                : "CL-" + dto.getId();
+                : "CL-" + (dto.getId() != null ? dto.getId() : System.currentTimeMillis());
 
         // Check if already exists by docket
         return caseRepository.findByCaseNumber(docket).orElseGet(() -> {
@@ -124,8 +127,8 @@ public class CourtListenerService {
             // Infer Domain & Court Level
             legalCase.setDomain(inferDomain(dto));
             legalCase.setCourtLevel(inferCourtLevel(dto));
-            legalCase.setCourtName(dto.getCourtExact() != null ? dto.getCourtExact() : (dto.getCourt() != null ? dto.getCourt().toUpperCase() : "US Federal Court"));
-            legalCase.setPresidingJudges(dto.getJudge() != null ? dto.getJudge() : "Presiding Judicial Bench");
+            legalCase.setCourtName(dto.getCourtExact() != null ? dto.getCourtExact() : (dto.getCourt() != null ? dto.getCourt() : "US Federal Court"));
+            legalCase.setPresidingJudges(dto.getJudge() != null && !dto.getJudge().isBlank() ? dto.getJudge() : "Presiding Judicial Bench");
             legalCase.setBenchType("Federal Appellate Bench");
 
             // Filing / Judgment Date
@@ -142,13 +145,14 @@ public class CourtListenerService {
             legalCase.setCaseDurationMonths(18);
 
             // Clean snippet text
-            String cleanSnippet = dto.getSnippet() != null
-                    ? dto.getSnippet().replaceAll("<[^>]*>", "").trim()
+            String rawSnippet = dto.getSnippet();
+            String cleanSnippet = (rawSnippet != null && !rawSnippet.isBlank())
+                    ? rawSnippet.replaceAll("<[^>]*>", "").trim()
                     : "Authoritative opinion retrieved via CourtListener API repository.";
             legalCase.setFactsSynopsis(cleanSnippet);
             legalCase.setLegalIssues("Questions of law and statutory interpretation concerning: " + dto.getCaseName());
             legalCase.setRatioDecidendi(cleanSnippet);
-            legalCase.setStatutesCited(dto.getSuitNature() != null ? dto.getSuitNature() : "Federal Judicial Code");
+            legalCase.setStatutesCited(dto.getSuitNature() != null && !dto.getSuitNature().isBlank() ? dto.getSuitNature() : "Federal Judicial Code");
             legalCase.setPrecedentsCited("Supreme Court & Circuit Authorities");
             legalCase.setOutcome(CaseOutcome.PETITIONER_FAVOR);
             legalCase.setSentenceOrDamages("Judicial Decree / Opinion");
