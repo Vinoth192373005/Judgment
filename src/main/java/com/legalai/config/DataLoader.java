@@ -42,40 +42,34 @@ public class DataLoader implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        long currentCount = caseRepository.count();
-        if (currentCount > 0) {
-            log.info("Database contains {} indexed cases. Initializing vector corpus...", currentCount);
-            recommendationService.reindexCorpus();
-            return;
-        }
+        log.info("Synchronizing Kaggle Legal Judgment dataset with database...");
 
-        log.info("Database is empty. Ingesting Kaggle Legal Judgment dataset into Supabase...");
-        List<LegalCase> cases = new ArrayList<>();
-
-        // 1. Ingest from Kaggle JSON Dataset
         try {
             ClassPathResource resource = new ClassPathResource("data/kaggle_legal_dataset.json");
             if (resource.exists()) {
                 try (InputStream is = resource.getInputStream()) {
                     List<LegalCase> jsonCases = objectMapper.readValue(is, new TypeReference<List<LegalCase>>() {});
-                    cases.addAll(jsonCases);
-                    log.info("Successfully parsed {} landmark cases from Kaggle dataset resource.", jsonCases.size());
+                    int addedCount = 0;
+                    for (LegalCase lc : jsonCases) {
+                        if (caseRepository.findByCaseNumber(lc.getCaseNumber()).isEmpty()) {
+                            caseRepository.save(lc);
+                            addedCount++;
+                        }
+                    }
+                    log.info("Dataset synchronization complete: {} new cases ingested. Total cases in DB: {}.", 
+                            addedCount, caseRepository.count());
                 }
             }
         } catch (Exception e) {
-            log.warn("Could not load from json dataset file: {}. Falling back to default benchmark data.", e.getMessage());
+            log.warn("Could not sync from json dataset file: {}.", e.getMessage());
         }
 
-        // 2. Add supplemental high-impact cases if needed
-        if (cases.isEmpty()) {
-            cases.addAll(getDefaultBenchmarkCases());
+        if (caseRepository.count() == 0) {
+            caseRepository.saveAll(getDefaultBenchmarkCases());
         }
-
-        caseRepository.saveAll(cases);
-        log.info("Saved {} legal case authorities into database.", cases.size());
 
         recommendationService.reindexCorpus();
-        log.info("TF-IDF Vector Corpus indexing complete.");
+        log.info("TF-IDF Vector Corpus indexing complete with {} active authorities.", caseRepository.count());
     }
 
     private List<LegalCase> getDefaultBenchmarkCases() {
@@ -97,24 +91,6 @@ public class DataLoader implements CommandLineRunner {
                 "The Apex Court struck down warrantless mass interception. Held that state surveillance must strictly satisfy the 4-pronged proportionality test: legitimate state aim, suitability, necessity, and strict balancing. Independent judicial oversight is mandatory for biometric interception.",
                 CaseOutcome.PETITIONER_FAVOR, "Executive Orders Quashed; Statutory Judicial Oversight Mandated",
                 null, true, "Right to Privacy, Article 21, Biometrics, Surveillance, Proportionality", 1420, 88
-        ));
-
-        cases.add(new LegalCase(
-                null, "FED-2024-IP-409", "984 F.3d 1120 (9th Cir. 2024)",
-                "NeuralNet AI Corp vs. Studio Creative Arts Syndicate",
-                LegalDomain.INTELLECTUAL_PROPERTY, CourtLevel.APPELLATE_COURT,
-                "US Court of Appeals for the Ninth Circuit", "Appellate Panel (3 Judges)",
-                "Judge Milan D. Smith, Jr., Judge Danielle J. Forrest",
-                "Studio Creative Arts Syndicate & Authors Guild",
-                "NeuralNet AI Corp & DeepLearning Ventures LLC",
-                2022, LocalDate.of(2024, 2, 14), 18,
-                "Visual artists and copyright holders sued an AI development company for ingesting 40 million copyrighted artistic works to train a commercial diffusion image model without license or credit. Defendant claimed statutory Fair Use defense under transformative purpose doctrine.",
-                "Does scraping and tokenizing copyrighted artistic works to train a generative AI model constitute Fair Use under Section 107 of the Copyright Act when the output competes directly in the same commercial marketplace?",
-                "17 U.S. Code § 106, 17 U.S. Code § 107 (Fair Use Doctrine), DMCA § 1202",
-                "Andy Warhol Foundation v. Goldsmith, 598 U.S. 504 (2023); Google LLC v. Oracle America, Inc., 141 S. Ct. 1164 (2021)",
-                "Held that while intermediate computational caching is transformative, commercial generative models producing market substitutes fail the fourth statutory fair use factor. Summary judgment reversed in favor of copyright holders.",
-                CaseOutcome.PETITIONER_FAVOR, "Remanded for Damages and Injunction Proceedings; Fair Use Defense Denied",
-                45000000.0, true, "Generative AI, Copyright, Fair Use, Training Data, Transformative Use", 2150, 94
         ));
 
         return cases;

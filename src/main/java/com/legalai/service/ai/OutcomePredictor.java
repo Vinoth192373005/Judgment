@@ -7,7 +7,6 @@ import com.legalai.model.RecommendationResult.MatchedPrecedent;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * AI Outcome Predictor using weighted probabilistic classification,
@@ -54,20 +53,22 @@ public class OutcomePredictor {
                 proDefendantWeight += score * 0.5;
             }
 
-            // Collect influential metadata
-            if (influentialPrecedents.size() < 4) {
-                influentialPrecedents.add(mp.getLegalCase().getTitle() + " (" + mp.getLegalCase().getCitation() + ")");
-            }
-            if (mp.getLegalCase().getStatutesCited() != null) {
-                for (String stat : mp.getLegalCase().getStatutesCited().split("[,;]")) {
-                    String cleanStat = stat.trim();
-                    if (!cleanStat.isBlank() && !decisiveStatutes.contains(cleanStat) && decisiveStatutes.size() < 5) {
-                        decisiveStatutes.add(cleanStat);
+            // Only collect metadata from precedents with genuine relevance
+            if (mp.getFactSimilarity() >= 12.0 || mp.getStatuteSimilarity() >= 20.0 || mp.getOverallScore() >= 45.0) {
+                if (influentialPrecedents.size() < 4) {
+                    influentialPrecedents.add(mp.getLegalCase().getTitle() + " (" + mp.getLegalCase().getCitation() + ")");
+                }
+                if (mp.getLegalCase().getStatutesCited() != null) {
+                    for (String stat : mp.getLegalCase().getStatutesCited().split("[,;]")) {
+                        String cleanStat = stat.trim();
+                        if (!cleanStat.isBlank() && !decisiveStatutes.contains(cleanStat) && decisiveStatutes.size() < 5) {
+                            decisiveStatutes.add(cleanStat);
+                        }
                     }
                 }
-            }
-            if (mp.getKeyTakeaway() != null && !mp.getKeyTakeaway().isBlank() && precedentTakeaways.size() < 3) {
-                precedentTakeaways.add(mp.getKeyTakeaway());
+                if (mp.getKeyTakeaway() != null && !mp.getKeyTakeaway().isBlank() && precedentTakeaways.size() < 3) {
+                    precedentTakeaways.add(mp.getKeyTakeaway());
+                }
             }
         }
 
@@ -81,45 +82,74 @@ public class OutcomePredictor {
         double petitionerWinProb = totalPrecedentWeight > 0 ? (proPlaintiffWeight / totalPrecedentWeight) * 100.0 : 50.0;
         double respondentWinProb = 100.0 - petitionerWinProb;
 
-        // Confidence calculation based on consensus among top matches
+        // Confidence calculation based on factual correlation and consensus
         double topOutcomeWeight = outcomeWeights.getOrDefault(predictedOutcome, 0.0);
         double consensusRatio = totalPrecedentWeight > 0 ? (topOutcomeWeight / totalPrecedentWeight) : 0.6;
-        double avgTopScore = topPrecedents.stream().mapToDouble(MatchedPrecedent::getOverallScore).average().orElse(70.0);
-        double confidence = Math.min(96.5, Math.max(55.0, (avgTopScore * 0.6) + (consensusRatio * 40.0)));
+        double avgTopScore = topPrecedents.stream().mapToDouble(MatchedPrecedent::getOverallScore).average().orElse(50.0);
+        double maxFactCosine = topPrecedents.stream().mapToDouble(MatchedPrecedent::getFactSimilarity).max().orElse(0.0);
+
+        // Scale confidence realistically with factual match quality
+        double baseConfidence = (avgTopScore * 0.5) + (consensusRatio * 35.0);
+        if (maxFactCosine < 15.0) {
+            baseConfidence = Math.min(52.0, baseConfidence * 0.8);
+        }
+        double confidence = Math.min(96.5, Math.max(38.0, baseConfidence));
 
         // Determine Risk Level & Rationale
         String riskLevel;
         String riskExplanation;
-        if (petitionerWinProb >= 75.0) {
+        if (maxFactCosine < 15.0) {
+            riskLevel = "LOW PRECEDENT DENSITY";
+            riskExplanation = "Limited factual correlation with local repository. Outcome synthesized based on legal domain averages and statutory burdens of proof.";
+        } else if (petitionerWinProb >= 75.0) {
             riskLevel = "LOW RISK";
-            riskExplanation = "Strong judicial consensus in favorable precedents. Core statutory requirements and factual elements align closely with established high-court doctrine.";
+            riskExplanation = "Strong judicial consensus in favorable precedents. Core statutory requirements and factual elements align closely with established doctrine.";
         } else if (petitionerWinProb >= 55.0) {
             riskLevel = "MODERATE RISK";
-            riskExplanation = "Favorable precedent leaning exists, but opposing lines of authority or strict burden of proof require robust evidentiary substantiation.";
+            riskExplanation = "Favorable precedent trajectory exists, but opposing lines of authority require robust evidentiary substantiation.";
         } else if (petitionerWinProb >= 35.0) {
             riskLevel = "ELEVATED RISK";
-            riskExplanation = "Contested legal posture. Precedents indicate heightened judicial scrutiny or defense doctrines (e.g. lack of privity, reasonable doubt, or procedural bar).";
+            riskExplanation = "Contested legal posture. Precedents indicate heightened judicial scrutiny or defense doctrines.";
         } else {
             riskLevel = "HIGH / CRITICAL RISK";
-            riskExplanation = "Adverse precedent trajectory. Historical judgments indicate strong probability of petition dismissal or defendant-favored judgment unless novel constitutional arguments are framed.";
+            riskExplanation = "Adverse precedent trajectory. Historical judgments indicate strong probability of petition dismissal or defendant-favored ruling.";
         }
 
-        // Generate judicial reasoning synthesis
+        // Generate contextual judicial reasoning synthesis
         StringBuilder reasoning = new StringBuilder();
-        reasoning.append("Based on multi-vector analysis across ").append(topPrecedents.size())
-                .append(" highly correlated precedents in ").append(request.getDomain() != null ? request.getDomain().getDisplayName() : "General Law")
-                .append(", the predictive model indicates a ").append(String.format("%.1f%%", petitionerWinProb))
-                .append(" probability of ruling favoring the Petitioner/Prosecution. ");
+        String domainName = request.getDomain() != null ? request.getDomain().getDisplayName() : "General Law";
 
-        if (!precedentTakeaways.isEmpty()) {
-            reasoning.append("Primary judicial ratio indicates: ");
-            reasoning.append(String.join("; ", precedentTakeaways)).append(". ");
+        if (maxFactCosine < 15.0) {
+            reasoning.append("Preliminary assessment for ")
+                    .append(domainName)
+                    .append(" claim indicates a projected ")
+                    .append(String.format("%.1f%%", petitionerWinProb))
+                    .append(" probability favoring the claimant based on general statutory standards. ");
+            if (!decisiveStatutes.isEmpty()) {
+                reasoning.append("Applicable statutory provisions: ").append(String.join(", ", decisiveStatutes)).append(". ");
+            }
+            reasoning.append("For higher precision, provide additional factual details (e.g. policy terms, collision timeline, surveyor report) or query CourtListener API for specific live precedents.");
+        } else {
+            reasoning.append("Based on multi-vector analysis across ")
+                    .append(topPrecedents.size())
+                    .append(" correlated precedents in ")
+                    .append(domainName)
+                    .append(", the predictive model indicates a ")
+                    .append(String.format("%.1f%%", petitionerWinProb))
+                    .append(" probability of ruling favoring the Petitioner/Prosecution. ");
+
+            if (!precedentTakeaways.isEmpty()) {
+                reasoning.append("Primary judicial ratios indicate: ");
+                reasoning.append(String.join("; ", precedentTakeaways)).append(". ");
+            }
+
+            if (!decisiveStatutes.isEmpty()) {
+                reasoning.append("Key statutory focal points: ").append(String.join(", ", decisiveStatutes)).append(".");
+            }
         }
-
-        reasoning.append("Key statutory focal points identified: ").append(String.join(", ", decisiveStatutes)).append(".");
 
         // Estimate remedy
-        String remedyEstimate = deriveRemedyEstimate(predictedOutcome, topPrecedents);
+        String remedyEstimate = deriveRemedyEstimate(predictedOutcome, topPrecedents, maxFactCosine);
 
         return new PredictionResult(
                 predictedOutcome,
@@ -135,10 +165,14 @@ public class OutcomePredictor {
         );
     }
 
-    private String deriveRemedyEstimate(CaseOutcome outcome, List<MatchedPrecedent> precedents) {
+    private String deriveRemedyEstimate(CaseOutcome outcome, List<MatchedPrecedent> precedents, double maxFactCosine) {
+        if (maxFactCosine < 15.0) {
+            return "Standard statutory remedy & damages assessed according to proven economic loss";
+        }
         switch (outcome) {
             case PETITIONER_FAVOR:
                 double avgDamages = precedents.stream()
+                        .filter(mp -> mp.getFactSimilarity() >= 15.0)
                         .map(mp -> mp.getLegalCase().getDamagesAmount())
                         .filter(Objects::nonNull)
                         .mapToDouble(Double::doubleValue)
@@ -164,14 +198,14 @@ public class OutcomePredictor {
     private PredictionResult fallbackPrediction() {
         return new PredictionResult(
                 CaseOutcome.PETITIONER_FAVOR,
-                60.0,
+                50.0,
                 55.0,
                 45.0,
-                "MODERATE RISK",
+                "LOW PRECEDENT DENSITY",
                 "Insufficient matching precedents in repository to form high-confidence prediction.",
                 Collections.emptyList(),
                 Collections.emptyList(),
-                "Preliminary estimate based on general legal standards.",
+                "Preliminary estimate based on general legal standards. Please provide more detailed factual background or query live CourtListener API.",
                 "Discretionary relief"
         );
     }
