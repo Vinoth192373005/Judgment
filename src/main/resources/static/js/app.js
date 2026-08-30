@@ -756,15 +756,17 @@ function renderJudgeTendencyTable(judges) {
 }
 
 // =========================================================================
-// 7. MODULE 3: Case Repository Explorer & CRUD
+// 7. MODULE 3: Case Repository Explorer & CRUD (Dual Search DB + API)
 // =========================================================================
 
 let searchTimeout = null;
+let cachedApiCases = [];
+
 function handleSearchInput() {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
         loadRepositoryCases();
-    }, 200);
+    }, 250);
 }
 
 async function loadRepositoryCases() {
@@ -782,15 +784,42 @@ async function loadRepositoryCases() {
     if (landmarkOnly) params.append('landmarkOnly', 'true');
 
     try {
-        const res = await fetch(`${API_BASE}/cases?${params.toString()}`);
-        cachedCases = await res.json();
+        const promises = [
+            fetch(`${API_BASE}/cases?${params.toString()}`).then(r => r.ok ? r.json() : [])
+        ];
 
-        document.getElementById('repoResultsSubtitle').textContent = `Showing ${cachedCases.length} case records matching active filters`;
+        // If query is provided, simultaneously search CourtListener live API
+        if (query) {
+            promises.push(
+                fetch(`${API_BASE}/courtlistener/search?query=${encodeURIComponent(query)}`)
+                    .then(r => r.ok ? r.json() : { results: [] })
+                    .then(data => data.results || [])
+                    .catch(err => {
+                        console.warn('CourtListener search error:', err);
+                        return [];
+                    })
+            );
+        }
+
+        const [dbRes, apiRes] = await Promise.all(promises);
+        cachedCases = Array.isArray(dbRes) ? dbRes : [];
+        cachedApiCases = Array.isArray(apiRes) ? apiRes : [];
+
+        const subtitleEl = document.getElementById('repoResultsSubtitle');
+        if (subtitleEl) {
+            if (query && cachedApiCases.length > 0) {
+                subtitleEl.textContent = `Showing ${cachedCases.length} indexed database authorities + ${cachedApiCases.length} live CourtListener API opinions for "${query}"`;
+            } else if (query) {
+                subtitleEl.textContent = `Showing ${cachedCases.length} matching database authorities for "${query}"`;
+            } else {
+                subtitleEl.textContent = `Showing ${cachedCases.length} indexed case authorities in repository`;
+            }
+        }
 
         if (currentRepoView === 'grid') {
-            renderRepoGrid(cachedCases);
+            renderRepoGrid(cachedCases, cachedApiCases);
         } else {
-            renderRepoTable(cachedCases);
+            renderRepoTable(cachedCases, cachedApiCases);
         }
     } catch (err) {
         console.error('Error fetching cases:', err);
@@ -805,68 +834,185 @@ function toggleRepoView(viewType) {
     if (viewType === 'grid') {
         document.getElementById('repoCardsGrid').classList.remove('hidden');
         document.getElementById('repoTableContainer').classList.add('hidden');
-        renderRepoGrid(cachedCases);
+        renderRepoGrid(cachedCases, cachedApiCases);
     } else {
         document.getElementById('repoCardsGrid').classList.add('hidden');
         document.getElementById('repoTableContainer').classList.remove('hidden');
-        renderRepoTable(cachedCases);
+        renderRepoTable(cachedCases, cachedApiCases);
     }
 }
 
-function renderRepoGrid(cases) {
+function renderRepoGrid(cases, apiCases = []) {
     const grid = document.getElementById('repoCardsGrid');
     if (!grid) return;
 
-    if (!cases || cases.length === 0) {
-        grid.innerHTML = '<div class="card p-4 text-center text-muted" style="grid-column: 1/-1;">No legal authorities match the query criteria.</div>';
+    if ((!cases || cases.length === 0) && (!apiCases || apiCases.length === 0)) {
+        grid.innerHTML = '<div class="card p-4 text-center text-muted" style="grid-column: 1/-1;">No legal authorities or CourtListener opinions match the query criteria.</div>';
         return;
     }
 
-    grid.innerHTML = cases.map(c => `
-        <div class="case-card" onclick="viewCaseDetailsById(${c.id})">
-            <div>
-                <div class="case-card-header">
-                    <span class="badge badge-domain">${formatEnum(c.domain)}</span>
-                    ${c.landmarkCase ? '<span class="badge badge-landmark">★ Landmark</span>' : ''}
+    let html = '';
+
+    // 1. Supabase Indexed DB Cases
+    if (cases && cases.length > 0) {
+        html += cases.map(c => `
+            <div class="case-card" onclick="viewCaseDetailsById(${c.id})">
+                <div>
+                    <div class="case-card-header">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span class="badge badge-domain">${formatEnum(c.domain)}</span>
+                            <span class="pill-chip pill-primary font-mono text-xs" style="font-size: 0.65rem;">Supabase DB</span>
+                        </div>
+                        ${c.landmarkCase ? '<span class="badge badge-landmark">★ Landmark</span>' : ''}
+                    </div>
+                    <h4 class="case-card-title">${escapeHtml(c.title)}</h4>
+                    <p class="case-card-citation">${escapeHtml(c.citation || c.caseNumber)} • ${escapeHtml(c.courtName)}</p>
+                    <p class="case-card-facts">${escapeHtml(c.factsSynopsis || 'No synopsis available.')}</p>
                 </div>
-                <h4 class="case-card-title">${escapeHtml(c.title)}</h4>
-                <p class="case-card-citation">${escapeHtml(c.citation || c.caseNumber)} • ${escapeHtml(c.courtName)}</p>
-                <p class="case-card-facts">${escapeHtml(c.factsSynopsis || 'No synopsis available.')}</p>
+                <div class="case-card-footer">
+                    <span>Verdict: <strong style="color: var(--gold-400);">${formatEnum(c.outcome)}</strong></span>
+                    <span class="text-dim font-mono">👁 ${c.viewCount || 0}</span>
+                </div>
             </div>
-            <div class="case-card-footer">
-                <span>Verdict: <strong style="color: var(--gold-400);">${formatEnum(c.outcome)}</strong></span>
-                <span class="text-dim font-mono">👁 ${c.viewCount || 0}</span>
+        `).join('');
+    }
+
+    // 2. CourtListener Live API Cases
+    if (apiCases && apiCases.length > 0) {
+        html += `
+            <div style="grid-column: 1/-1; margin-top: 24px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-subtle); padding-top: 16px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="pill-chip pill-subtle font-mono text-xs">CourtListener API v4</span>
+                    <h4 class="repo-title" style="font-size: 1rem; margin: 0;">Live Global Precedent Opinions (${apiCases.length} Records)</h4>
+                </div>
+                <span class="text-xs text-muted">Click import to persist any opinion into Supabase</span>
             </div>
-        </div>
-    `).join('');
+        `;
+
+        html += apiCases.map((c, idx) => `
+            <div class="case-card" style="border-color: rgba(99, 102, 241, 0.3); background: rgba(99, 102, 241, 0.03);">
+                <div>
+                    <div class="case-card-header">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span class="pill-chip pill-subtle font-mono text-xs" style="font-size: 0.65rem;">CourtListener API</span>
+                            <span class="badge badge-landmark">${escapeHtml(c.court_exact || c.court || 'Federal Court')}</span>
+                        </div>
+                        <span class="text-dim text-xs font-mono">${escapeHtml(c.dateFiled || '')}</span>
+                    </div>
+                    <h4 class="case-card-title">${escapeHtml(c.caseName || 'Unnamed Opinion')}</h4>
+                    <p class="case-card-citation">${escapeHtml((c.citation && c.citation.length > 0) ? c.citation.join(', ') : c.court_citation_string || c.docketNumber || 'Citation Pending')} • Judge: ${escapeHtml(c.judge || 'Bench Not Listed')}</p>
+                    <p class="case-card-facts" style="font-style: italic; color: var(--text-secondary);">${escapeHtml(c.snippet || 'Authoritative opinion text excerpt from CourtListener.')}</p>
+                </div>
+                <div class="case-card-footer" style="padding-top: 8px;">
+                    <span class="text-dim text-xs">Docket #${escapeHtml(c.docketNumber || 'CL-' + (c.id || ''))}</span>
+                    <button class="btn btn-primary btn-sm" id="btnIngestGrid_${idx}" onclick="importCourtListenerFromRepo(${idx}, event)">
+                        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>
+                        <span>Import to Supabase</span>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    grid.innerHTML = html;
 }
 
-function renderRepoTable(cases) {
+function renderRepoTable(cases, apiCases = []) {
     const tbody = document.getElementById('repoTableBody');
     if (!tbody) return;
 
-    if (!cases || cases.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No legal cases found.</td></tr>';
+    if ((!cases || cases.length === 0) && (!apiCases || apiCases.length === 0)) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No legal cases found.</td></tr>';
         return;
     }
 
-    tbody.innerHTML = cases.map(c => `
-        <tr>
-            <td><strong style="color: var(--azure-400); font-family: var(--font-mono);">${escapeHtml(c.citation || c.caseNumber)}</strong></td>
-            <td><strong>${escapeHtml(c.title)}</strong></td>
-            <td><span class="badge badge-domain">${formatEnum(c.domain)}</span></td>
-            <td>${escapeHtml(c.courtName)}</td>
-            <td><span class="font-mono">${c.judgmentDate || c.filingYear}</span></td>
-            <td><span class="badge badge-landmark">${formatEnum(c.outcome)}</span></td>
-            <td>
-                <div style="display: flex; gap: 6px;">
-                    <button class="btn btn-outline btn-sm" onclick="viewCaseDetailsById(${c.id})">Brief</button>
-                    <button class="btn btn-secondary btn-sm" onclick="openEditCaseModal(${c.id}, event)">Edit</button>
-                    <button class="btn btn-danger btn-sm" onclick="deleteCase(${c.id}, event)">Del</button>
-                </div>
-            </td>
-        </tr>
-    `).join('');
+    let rows = '';
+
+    if (cases && cases.length > 0) {
+        rows += cases.map(c => `
+            <tr>
+                <td><span class="pill-chip pill-primary font-mono text-xs">Supabase DB</span></td>
+                <td><strong style="color: var(--azure-400); font-family: var(--font-mono);">${escapeHtml(c.citation || c.caseNumber)}</strong></td>
+                <td><strong>${escapeHtml(c.title)}</strong></td>
+                <td><span class="badge badge-domain">${formatEnum(c.domain)}</span></td>
+                <td>${escapeHtml(c.courtName)}</td>
+                <td><span class="font-mono">${c.judgmentDate || c.filingYear}</span></td>
+                <td><span class="badge badge-landmark">${formatEnum(c.outcome)}</span></td>
+                <td>
+                    <div style="display: flex; gap: 6px;">
+                        <button class="btn btn-outline btn-sm" onclick="viewCaseDetailsById(${c.id})">Brief</button>
+                        <button class="btn btn-secondary btn-sm" onclick="openEditCaseModal(${c.id}, event)">Edit</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteCase(${c.id}, event)">Del</button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    if (apiCases && apiCases.length > 0) {
+        rows += apiCases.map((c, idx) => `
+            <tr style="background: rgba(99, 102, 241, 0.04);">
+                <td><span class="pill-chip pill-subtle font-mono text-xs">CourtListener API</span></td>
+                <td><strong style="color: var(--indigo-400); font-family: var(--font-mono);">${escapeHtml((c.citation && c.citation.length > 0) ? c.citation[0] : c.docketNumber || 'CL-' + c.id)}</strong></td>
+                <td><strong>${escapeHtml(c.caseName || 'Unnamed Opinion')}</strong></td>
+                <td><span class="badge badge-domain">${escapeHtml(c.suitNature || 'Federal Law')}</span></td>
+                <td>${escapeHtml(c.court_exact || c.court || 'Federal Court')}</td>
+                <td><span class="font-mono">${escapeHtml(c.dateFiled || 'N/A')}</span></td>
+                <td><span class="badge badge-landmark">Live API</span></td>
+                <td>
+                    <button class="btn btn-primary btn-sm" id="btnIngestTable_${idx}" onclick="importCourtListenerFromRepo(${idx}, event)">
+                        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>
+                        <span>Ingest</span>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    tbody.innerHTML = rows;
+}
+
+async function importCourtListenerFromRepo(idx, event) {
+    if (event) event.stopPropagation();
+    const item = cachedApiCases[idx];
+    if (!item) return;
+
+    const btnGrid = document.getElementById(`btnIngestGrid_${idx}`);
+    const btnTable = document.getElementById(`btnIngestTable_${idx}`);
+
+    [btnGrid, btnTable].forEach(btn => {
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `<span class="spinner"></span> <span>Ingesting...</span>`;
+        }
+    });
+
+    try {
+        const res = await fetch(`${API_BASE}/courtlistener/import`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(item)
+        });
+
+        if (!res.ok) throw new Error('Import failed');
+
+        const savedCase = await res.json();
+        showToast(`Ingested "${savedCase.title}" into Supabase!`, 'success');
+
+        // Reload repository and analytics
+        loadRepositoryCases();
+        loadAnalyticsDashboard();
+        populateComparisonDropdowns();
+    } catch (err) {
+        console.error(err);
+        showToast('Failed to ingest case to Supabase', 'error');
+        [btnGrid, btnTable].forEach(btn => {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = `<span>Import to Supabase</span>`;
+            }
+        });
+    }
 }
 
 // =========================================================================
