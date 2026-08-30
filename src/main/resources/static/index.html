@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Judgment — AI Legal Case Recommendation &amp; Judgment Analytics Engine</title>
+    <meta name="description" content="Judgment: AI-Powered Legal Precedent Recommendation, Judicial Outcome Prediction, and Judgment Analytics Platform for Legal Counsel, Judicial Clerks, and Corporate Practice.">
+    
+    <!-- Google Fonts: Plus Jakarta Sans, Inter, Newsreader, JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400;1,6..72,600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Chart.js for Executive Visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    
+    <!-- Design System Stylesheet -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+        <div class="header-container">
+            <!-- Brand Section -->
+            <div class="brand-section">
+                <div class="brand-logo" aria-label="Judgment Logo">
+                    <svg class="brand-svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"></path>
+                        <path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"></path>
+                        <path d="M7 21h10"></path>
+                        <path d="M12 3v18"></path>
+                        <path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"></path>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <div class="brand-title-wrap">
+                        <h1 class="brand-title">JUDGMENT<span class="brand-ai">AI</span></h1>
+                        <span class="brand-tier-badge">ENTERPRISE</span>
+                    </div>
+                    <p class="brand-subtitle">Judicial Intelligence &amp; Precedent Retrieval</p>
+                </div>
+            </div>
+
+            <!-- Global Quick Search Trigger (⌘K) -->
+            <div class="header-search-bar" onclick="openCommandPalette()" role="button" tabindex="0" title="Quick Search (Press ⌘K or Ctrl+K)">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <span class="search-placeholder">Search repository (⌘K)...</span>
+                <kbd class="search-kbd">⌘K</kbd>
+            </div>
+
+            <!-- Header Actions & Controls -->
+            <div class="header-actions">
+                <!-- Live AI Engine Telemetry Badge -->
+                <div class="engine-status-badge" title="TF-IDF Vector Space Model & Outcome Predictor Active">
+                    <span class="status-pulse-dot"></span>
+                    <span class="status-label" id="systemStatusText">Vector Corpus Active</span>
+                </div>
+
+                <!-- Theme Toggle Button -->
+                <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle Dark / Light Theme" aria-label="Toggle Theme">
+                    <svg class="sun-icon" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                    <svg class="moon-icon" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </button>
+
+                <!-- Export Brief Button -->
+                <button class="btn btn-secondary btn-sm" id="btnExportBrief" onclick="openExportModal()" title="Export Brief">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"></path></svg>
+                    <span>Export</span>
+                </button>
+
+                <!-- New Case Entry Button -->
+                <button class="btn btn-primary btn-sm" id="btnNewCase" onclick="openNewCaseModal()">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    <span>New Case</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Tab Navigation Bar -->
+        <nav class="nav-tabs-wrapper">
+            <div class="nav-tabs">
+                <button class="tab-btn active" data-tab="recommendationTab" onclick="switchTab('recommendationTab')">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+                    <span>AI Recommendation &amp; Prediction Studio</span>
+                </button>
+                <button class="tab-btn" data-tab="analyticsTab" onclick="switchTab('analyticsTab')">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    <span>Judicial Analytics Dashboard</span>
+                </button>
+                <button class="tab-btn" data-tab="repositoryTab" onclick="switchTab('repositoryTab')">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                    <span>Case Repository Explorer</span>
+                </button>
+                <button class="tab-btn" data-tab="comparisonTab" onclick="switchTab('comparisonTab')">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"></path></svg>
+                    <span>Comparative Jurisprudence Matrix</span>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Application Container -->
+    <main class="main-content">
+
+        <!-- ================================================================= -->
+        <!-- TAB 1: AI RECOMMENDATION & OUTCOME PREDICTION STUDIO              -->
+        <!-- ================================================================= -->
+        <section id="recommendationTab" class="tab-content active">
+            <div class="studio-layout">
+                
+                <!-- Left Input Workbench Panel -->
+                <div class="studio-input-panel">
+                    <div class="card workbench-card">
+                        <div class="card-header border-bottom">
+                            <div>
+                                <div class="badge-row">
+                                    <span class="pill-chip pill-primary">NLP Vector Engine</span>
+                                </div>
+                                <h3 class="panel-heading mt-1">Case Fact Formulation Workbench</h3>
+                                <p class="panel-subheading">Enter factual synopsis and statutory citations to predict judicial outcomes and retrieve precedent authorities.</p>
+                            </div>
+                        </div>
+
+                        <!-- Intake Form -->
+                        <form id="recommendationForm" onsubmit="handleAnalyzeSubmit(event)" class="workbench-form">
+                            <div class="form-group">
+                                <label for="inputFacts" class="form-label">Factual Background &amp; Material Events <span class="required">*</span></label>
+                                <textarea id="inputFacts" class="form-control text-area-lg" rows="6" placeholder="Enter factual background, chronological events, breach or offense, and damages..." required></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="inputIssues" class="form-label">Questions of Law / Core Issues</label>
+                                <textarea id="inputIssues" class="form-control" rows="2" placeholder="Specify legal questions or statutory issues..."></textarea>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group col-6">
+                                    <label for="inputDomain" class="form-label">Practice Area / Domain</label>
+                                    <select id="inputDomain" class="form-control form-select">
+                                        <option value="">-- Auto-Infer Practice Domain --</option>
+                                    </select>
+                                </div>
+                                <div class="form-group col-6">
+                                    <label for="inputCourtLevel" class="form-label">Target Judicial Tier</label>
+                                    <select id="inputCourtLevel" class="form-control form-select">
+                                        <option value="">-- Any Forum / Bench Tier --</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="inputStatutes" class="form-label">Statutes &amp; Legal Provisions Cited</label>
+                                <input type="text" id="inputStatutes" class="form-control" placeholder="Statutory provisions separated by commas">
+                            </div>
+
+                            <!-- Advanced Scoring Weights Accordion -->
+                            <div class="scoring-weights-card">
+                                <div class="weights-header" onclick="toggleWeightsPanel()" role="button" tabindex="0">
+                                    <div class="weights-header-title">
+                                        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"></path><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"></path></svg>
+                                        <span>Custom AI Scoring Weights</span>
+                                    </div>
+                                    <svg id="weightChevron" class="chevron-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                </div>
+                                <div id="weightsBody" class="weights-body hidden">
+                                    <div class="slider-item">
+                                        <div class="slider-label-row">
+                                            <span>Fact Cosine Similarity</span>
+                                            <span class="slider-val" id="valFactW">40%</span>
+                                        </div>
+                                        <input type="range" id="weightFact" min="10" max="80" value="40" oninput="updateWeightDisplay()" class="custom-slider">
+                                    </div>
+                                    <div class="slider-item">
+                                        <div class="slider-label-row">
+                                            <span>Statute Overlap Weight</span>
+                                            <span class="slider-val" id="valStatW">25%</span>
+                                        </div>
+                                        <input type="range" id="weightStat" min="5" max="60" value="25" oninput="updateWeightDisplay()" class="custom-slider">
+                                    </div>
+                                    <div class="slider-item">
+                                        <div class="slider-label-row">
+                                            <span>Practice Domain Match</span>
+                                            <span class="slider-val" id="valDomW">15%</span>
+                                        </div>
+                                        <input type="range" id="weightDom" min="5" max="40" value="15" oninput="updateWeightDisplay()" class="custom-slider">
+                                    </div>
+                                    <div class="slider-item">
+                                        <div class="slider-label-row">
+                                            <span>Court Hierarchy Weight</span>
+                                            <span class="slider-val" id="valCourtW">10%</span>
+                                        </div>
+                                        <input type="range" id="weightCourt" min="0" max="30" value="10" oninput="updateWeightDisplay()" class="custom-slider">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-block" id="btnRunPrediction">
+                                <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+                                <span>Execute AI Prediction &amp; Precedent Match</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Right Results Dossier Panel -->
+                <div class="studio-results-panel">
+                    
+                    <!-- Prediction Banner Card -->
+                    <div id="predictionBanner" class="card prediction-dossier-card">
+                        
+                        <!-- Empty Placeholder State -->
+                        <div class="placeholder-dossier" id="predictionPlaceholder">
+                            <div class="placeholder-dossier-icon">
+                                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"></path>
+                                    <path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"></path>
+                                    <path d="M7 21h10"></path>
+                                    <path d="M12 3v18"></path>
+                                    <path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"></path>
+                                </svg>
+                            </div>
+                            <h3 class="placeholder-title">Awaiting Case Submission</h3>
+                            <p class="placeholder-desc">Enter the case factual background in the formulation workbench on the left to synthesize judicial outcome forecasts and retrieve matching legal authorities.</p>
+                        </div>
+
+                        <!-- Active Prediction Content -->
+                        <div id="predictionContent" class="hidden prediction-content-wrapper">
+                            
+                            <!-- Executive Dossier Header -->
+                            <div class="dossier-header-bar">
+                                <div class="dossier-header-left">
+                                    <span class="dossier-kicker">AI JUDICIAL FORECAST</span>
+                                    <div class="dossier-badges-row">
+                                        <span class="verdict-badge" id="predOutcomeBadge"></span>
+                                        <span class="risk-pill" id="predRiskBadge"></span>
+                                    </div>
+                                </div>
+                                <div class="dossier-confidence-meter">
+                                    <span class="conf-kicker">Model Confidence</span>
+                                    <span class="conf-number" id="predConfidence">0%</span>
+                                </div>
+                            </div>
+
+                            <!-- Win Probability Barometer -->
+                            <div class="barometer-card">
+                                <div class="barometer-header">
+                                    <div class="party-prob party-petitioner">
+                                        <span class="party-dot"></span>
+                                        <span class="party-name">Petitioner Probability:</span>
+                                        <strong class="party-val" id="predPetitionerWin">0%</strong>
+                                    </div>
+                                    <div class="party-prob party-respondent">
+                                        <span class="party-name">Respondent Probability:</span>
+                                        <strong class="party-val" id="predRespondentWin">0%</strong>
+                                        <span class="party-dot"></span>
+                                    </div>
+                                </div>
+                                <div class="barometer-track">
+                                    <div class="barometer-fill petitioner" id="probPetitionerFill" style="width: 0%;"></div>
+                                    <div class="barometer-fill respondent" id="probRespondentFill" style="width: 0%;"></div>
+                                </div>
+                            </div>
+
+                            <!-- Judicial Reasoning Synthesis Card -->
+                            <div class="reasoning-dossier-box">
+                                <div class="box-badge-row">
+                                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                                    <span class="box-badge-title">Synthesized Judicial Rationale</span>
+                                </div>
+                                <p id="predReasoningText" class="reasoning-paragraph"></p>
+                            </div>
+
+                            <!-- Remedy & Risk Assessment Split -->
+                            <div class="split-info-row">
+                                <div class="info-block">
+                                    <span class="info-block-label">Projected Remedy / Ruling</span>
+                                    <p id="predRemedyText" class="info-block-value"></p>
+                                </div>
+                                <div class="info-block">
+                                    <span class="info-block-label">Litigation Risk Assessment</span>
+                                    <p id="predRiskExplanation" class="info-block-value"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recommended Case Precedents Section -->
+                    <div class="card precedents-container-card" id="precedentsCard">
+                        <div class="card-header border-bottom">
+                            <div>
+                                <h4 class="card-title-lg">Top Recommended Precedent Authorities</h4>
+                                <p class="card-subtitle" id="precedentsSummaryCount">Ranked by factual, statutory, and jurisdictional cosine affinity</p>
+                            </div>
+                        </div>
+                        <div id="precedentsList" class="precedents-feed">
+                            <div class="empty-feed-state">
+                                <p class="text-muted text-sm">Execute an AI analysis on the left to view ranked judicial authorities with similarity breakdowns.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Suggested Legal Arguments & Statutes Section -->
+                    <div id="argumentsSection" class="arguments-statutes-grid hidden">
+                        <div class="card">
+                            <div class="card-header border-bottom">
+                                <h5 class="card-title-md">Recommended Pleading Arguments</h5>
+                            </div>
+                            <ul class="argument-checklist" id="suggestedArgumentsList">
+                                <!-- Dynamic items -->
+                            </ul>
+                        </div>
+                        <div class="card">
+                            <div class="card-header border-bottom">
+                                <h5 class="card-title-md">Critical Statutes &amp; Provisions to Cite</h5>
+                            </div>
+                            <div class="statutes-chip-wrap" id="statutesToCiteTags">
+                                <!-- Dynamic tags -->
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ================================================================= -->
+        <!-- TAB 2: JUDICIAL ANALYTICS DASHBOARD MODULE                        -->
+        <!-- ================================================================= -->
+        <section id="analyticsTab" class="tab-content">
+            <!-- Executive Metrics Row -->
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-icon icon-amber">
+                        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+                    </div>
+                    <div class="kpi-content">
+                        <span class="kpi-label">Total Indexed Authorities</span>
+                        <h3 class="kpi-value" id="kpiTotalCases">--</h3>
+                        <span class="kpi-trend positive" id="kpiLandmarkCount"></span>
+                    </div>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="kpi-icon icon-emerald">
+                        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                    </div>
+                    <div class="kpi-content">
+                        <span class="kpi-label">Petitioner Win Rate</span>
+                        <h3 class="kpi-value" id="kpiWinRate">--</h3>
+                        <span class="kpi-trend">Cross-Jurisdiction Benchmark</span>
+                    </div>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="kpi-icon icon-indigo">
+                        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    </div>
+                    <div class="kpi-content">
+                        <span class="kpi-label">Avg. Case Duration</span>
+                        <h3 class="kpi-value" id="kpiAvgDuration">--</h3>
+                        <span class="kpi-trend">Filing to Final Decree</span>
+                    </div>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="kpi-icon icon-cyan">
+                        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                    </div>
+                    <div class="kpi-content">
+                        <span class="kpi-label">Avg. Damages Awarded</span>
+                        <h3 class="kpi-value" id="kpiAvgDamages">--</h3>
+                        <span class="kpi-trend positive">Commercial &amp; IP Holdings</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visualizations Grid -->
+            <div class="analytics-grid">
+                <div class="card chart-card">
+                    <div class="card-header">
+                        <div>
+                            <h4 class="card-title-md">Judicial Outcome Classifications</h4>
+                            <p class="card-subtitle">Aggregate distribution across all indexed rulings</p>
+                        </div>
+                    </div>
+                    <div class="chart-canvas-container">
+                        <canvas id="outcomeDistributionChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card chart-card">
+                    <div class="card-header">
+                        <div>
+                            <h4 class="card-title-md">Petitioner Win Rate by Practice Domain</h4>
+                            <p class="card-subtitle">Percentage of claims decided in favor of petitioner</p>
+                        </div>
+                    </div>
+                    <div class="chart-canvas-container">
+                        <canvas id="domainWinRateChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card chart-card">
+                    <div class="card-header">
+                        <div>
+                            <h4 class="card-title-md">Litigation &amp; Verdict Trajectory</h4>
+                            <p class="card-subtitle">Annual disposal trends and petitioner vs respondent ratios</p>
+                        </div>
+                    </div>
+                    <div class="chart-canvas-container">
+                        <canvas id="yearlyTrendsChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card chart-card">
+                    <div class="card-header">
+                        <div>
+                            <h4 class="card-title-md">Court Tier Volume</h4>
+                            <p class="card-subtitle">Indexed authority distribution across judicial tiers</p>
+                        </div>
+                    </div>
+                    <div class="chart-canvas-container">
+                        <canvas id="courtDistributionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Judicial Bench & Statute Analytics Row -->
+            <div class="analytics-split-row">
+                <!-- Top Cited Statutes Leaderboard -->
+                <div class="card">
+                    <div class="card-header border-bottom">
+                        <div>
+                            <h4 class="card-title-md">Most Cited Statutory Provisions</h4>
+                            <p class="card-subtitle">Citation frequency and petitioner favor rate</p>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table" id="topStatutesTable">
+                            <thead>
+                                <tr>
+                                    <th>Statutory Act / Provision</th>
+                                    <th>Citations</th>
+                                    <th>Petitioner Favor Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Loaded dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Judicial Bench Tendency Analytics -->
+                <div class="card">
+                    <div class="card-header border-bottom">
+                        <div>
+                            <h4 class="card-title-md">Judicial Bench Tendency Index</h4>
+                            <p class="card-subtitle">Presiding judge ruling dispositions</p>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table" id="judgeTendencyTable">
+                            <thead>
+                                <tr>
+                                    <th>Presiding Judge</th>
+                                    <th>Cases</th>
+                                    <th>Primary Domain</th>
+                                    <th>Petitioner Favor %</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Loaded dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ================================================================= -->
+        <!-- TAB 3: CASE REPOSITORY EXPLORER MODULE                            -->
+        <!-- ================================================================= -->
+        <section id="repositoryTab" class="tab-content">
+            <!-- Search & Filter Controls -->
+            <div class="card mb-4">
+                <div class="search-filter-toolbar">
+                    <div class="search-input-group">
+                        <svg class="search-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <input type="text" id="repoSearchQuery" class="form-control search-input" placeholder="Search by title, citation, docket, holding, or judge..." oninput="handleSearchInput()">
+                    </div>
+
+                    <div class="filters-row">
+                        <select id="repoDomainFilter" class="form-control form-select filter-select" onchange="loadRepositoryCases()">
+                            <option value="">All Practice Domains</option>
+                        </select>
+
+                        <select id="repoCourtFilter" class="form-control form-select filter-select" onchange="loadRepositoryCases()">
+                            <option value="">All Judicial Tiers</option>
+                        </select>
+
+                        <select id="repoOutcomeFilter" class="form-control form-select filter-select" onchange="loadRepositoryCases()">
+                            <option value="">All Outcomes</option>
+                        </select>
+
+                        <label class="checkbox-landmark-label">
+                            <input type="checkbox" id="repoLandmarkFilter" onchange="loadRepositoryCases()">
+                            <span>Landmark Cases Only</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Repository Header Info & View Toggles -->
+            <div class="repo-header-info">
+                <div>
+                    <h3 class="repo-title" id="repoResultsCountTitle">Indexed Case Authorities</h3>
+                    <p class="text-muted text-sm" id="repoResultsSubtitle">Displaying all indexed case records in vector repository</p>
+                </div>
+                <div class="view-toggles-wrap">
+                    <button class="btn-view-toggle active" id="btnGridView" onclick="toggleRepoView('grid')" title="Card Grid View">
+                        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                        <span>Grid</span>
+                    </button>
+                    <button class="btn-view-toggle" id="btnTableView" onclick="toggleRepoView('table')" title="Dense Data Table View">
+                        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                        <span>Table</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Case Card Grid View -->
+            <div id="repoCardsGrid" class="cases-grid">
+                <!-- Dynamically populated -->
+            </div>
+
+            <!-- Case Table View Container -->
+            <div id="repoTableContainer" class="card hidden">
+                <div class="table-responsive">
+                    <table class="data-table" id="repoDataTable">
+                        <thead>
+                            <tr>
+                                <th>Citation / Docket #</th>
+                                <th>Case Authority Title</th>
+                                <th>Domain</th>
+                                <th>Court Level</th>
+                                <th>Judgment Date</th>
+                                <th>Outcome</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="repoTableBody">
+                            <!-- Dynamically populated -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ================================================================= -->
+        <!-- TAB 4: CASE COMPARISON MATRIX MODULE                              -->
+        <!-- ================================================================= -->
+        <section id="comparisonTab" class="tab-content">
+            <div class="card mb-4">
+                <div class="card-header border-bottom">
+                    <div>
+                        <h4 class="card-title-lg">Side-by-Side Comparative Jurisprudence Matrix</h4>
+                        <p class="card-subtitle">Select 2 to 3 judicial authorities to align factual matrices, legal questions, ratio decidendi, and outcomes.</p>
+                    </div>
+                </div>
+                <div class="comparison-selectors-row">
+                    <div class="selector-box">
+                        <label class="form-label">Authority #1 <span class="required">*</span></label>
+                        <select id="compareCase1" class="form-control form-select" onchange="runCaseComparison()">
+                            <option value="">-- Choose First Case --</option>
+                        </select>
+                    </div>
+                    <div class="selector-box">
+                        <label class="form-label">Authority #2 <span class="required">*</span></label>
+                        <select id="compareCase2" class="form-control form-select" onchange="runCaseComparison()">
+                            <option value="">-- Choose Second Case --</option>
+                        </select>
+                    </div>
+                    <div class="selector-box">
+                        <label class="form-label">Authority #3 (Optional)</label>
+                        <select id="compareCase3" class="form-control form-select" onchange="runCaseComparison()">
+                            <option value="">-- None --</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Comparison Results Matrix -->
+            <div id="comparisonResultsContainer">
+                <div class="card placeholder-state-matrix" id="comparisonPlaceholder">
+                    <div class="placeholder-icon">⚖</div>
+                    <h4>Select at least 2 case authorities above to generate side-by-side comparative analysis.</h4>
+                </div>
+
+                <div id="comparisonContent" class="hidden">
+                    <div class="card mb-4 synthesis-card">
+                        <div class="card-header border-bottom">
+                            <h5 class="card-title-md">Comparative Jurisprudential Synthesis</h5>
+                        </div>
+                        <p id="comparisonSynthesisText" class="synthesis-body"></p>
+                    </div>
+
+                    <div class="comparison-columns-grid" id="comparisonColumns">
+                        <!-- Dynamically populated columns -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ================================================================= -->
+    <!-- GLOBAL MODALS                                                     -->
+    <!-- ================================================================= -->
+
+    <!-- Global Command Palette Modal (⌘K) -->
+    <div id="commandPaletteModal" class="modal-backdrop hidden" onclick="closeCommandPalette(event)">
+        <div class="palette-container" onclick="event.stopPropagation()">
+            <div class="palette-search-header">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="paletteSearchInput" class="palette-input" placeholder="Search repository..." oninput="handlePaletteSearch()">
+                <kbd class="esc-kbd" onclick="closeCommandPalette()">ESC</kbd>
+            </div>
+            <div class="palette-results-list" id="paletteResultsList">
+                <!-- Dynamically populated results & quick actions -->
+            </div>
+            <div class="palette-footer">
+                <span>Navigate <kbd>↑</kbd> <kbd>↓</kbd></span>
+                <span>Select <kbd>↵</kbd></span>
+                <span>Close <kbd>ESC</kbd></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Case Details Brief Modal -->
+    <div id="caseDetailsModal" class="modal-backdrop hidden" onclick="closeDetailsModal(event)">
+        <div class="modal-container modal-lg" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-badge-row">
+                        <span class="pill-chip pill-primary" id="modalCaseDomain"></span>
+                        <span class="pill-chip pill-subtle" id="modalCaseCourt"></span>
+                    </div>
+                    <h3 class="modal-title mt-1" id="modalCaseTitle"></h3>
+                    <p class="modal-subtitle font-mono" id="modalCaseCitation"></p>
+                </div>
+                <button class="modal-close-btn" onclick="closeDetailsModal()" title="Close Brief">&times;</button>
+            </div>
+            <div class="modal-body" id="modalCaseBody">
+                <!-- Dynamically loaded case details -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="copyModalCitation()">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    <span>Copy Citation</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add / Edit Case Intake Modal -->
+    <div id="caseFormModal" class="modal-backdrop hidden" onclick="closeCaseFormModal(event)">
+        <div class="modal-container modal-lg" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title" id="caseFormModalTitle">Add New Legal Case to Repository</h3>
+                    <p class="modal-subtitle">Case authority will be automatically processed by the TF-IDF vectorizer and indexed for similarity search.</p>
+                </div>
+                <button class="modal-close-btn" onclick="closeCaseFormModal()" title="Close Modal">&times;</button>
+            </div>
+            <form id="caseIntakeForm" onsubmit="handleCaseFormSubmit(event)">
+                <input type="hidden" id="formCaseId">
+                <div class="modal-body">
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label for="formCaseNumber" class="form-label">Docket / Case Number <span class="required">*</span></label>
+                            <input type="text" id="formCaseNumber" class="form-control font-mono" placeholder="Docket number" required>
+                        </div>
+                        <div class="form-group col-6">
+                            <label for="formCitation" class="form-label">Official Legal Citation</label>
+                            <input type="text" id="formCitation" class="form-control font-mono" placeholder="Legal citation">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="formTitle" class="form-label">Case Title / Caption <span class="required">*</span></label>
+                        <input type="text" id="formTitle" class="form-control" placeholder="Case title" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label for="formPetitioner" class="form-label">Petitioner / Appellant <span class="required">*</span></label>
+                            <input type="text" id="formPetitioner" class="form-control" required>
+                        </div>
+                        <div class="form-group col-6">
+                            <label for="formRespondent" class="form-label">Respondent / Defendant <span class="required">*</span></label>
+                            <input type="text" id="formRespondent" class="form-control" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group col-4">
+                            <label for="formDomain" class="form-label">Practice Domain <span class="required">*</span></label>
+                            <select id="formDomain" class="form-control form-select" required></select>
+                        </div>
+                        <div class="form-group col-4">
+                            <label for="formCourtLevel" class="form-label">Court Level <span class="required">*</span></label>
+                            <select id="formCourtLevel" class="form-control form-select" required></select>
+                        </div>
+                        <div class="form-group col-4">
+                            <label for="formOutcome" class="form-label">Outcome Disposition <span class="required">*</span></label>
+                            <select id="formOutcome" class="form-control form-select" required></select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label for="formCourtName" class="form-label">Court Name <span class="required">*</span></label>
+                            <input type="text" id="formCourtName" class="form-control" placeholder="Court or tribunal name" required>
+                        </div>
+                        <div class="form-group col-6">
+                            <label for="formJudges" class="form-label">Presiding Judges / Bench</label>
+                            <input type="text" id="formJudges" class="form-control" placeholder="Presiding judges">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group col-4">
+                            <label for="formJudgmentDate" class="form-label">Judgment Date</label>
+                            <input type="date" id="formJudgmentDate" class="form-control">
+                        </div>
+                        <div class="form-group col-4">
+                            <label for="formDuration" class="form-label">Duration (Months)</label>
+                            <input type="number" id="formDuration" class="form-control" value="18">
+                        </div>
+                        <div class="form-group col-4">
+                            <label for="formDamages" class="form-label">Damages Amount ($)</label>
+                            <input type="number" id="formDamages" class="form-control">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="formFacts" class="form-label">Factual Background &amp; Synopsis <span class="required">*</span></label>
+                        <textarea id="formFacts" class="form-control" rows="4" required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="formIssues" class="form-label">Questions of Law / Core Issues</label>
+                        <textarea id="formIssues" class="form-control" rows="2"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="formRatio" class="form-label">Ratio Decidendi (Core Legal Holding) <span class="required">*</span></label>
+                        <textarea id="formRatio" class="form-control" rows="3" required></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label for="formStatutes" class="form-label">Statutes &amp; Provisions Cited</label>
+                            <input type="text" id="formStatutes" class="form-control" placeholder="Cited statutes">
+                        </div>
+                        <div class="form-group col-6">
+                            <label for="formTags" class="form-label">Practice Tags</label>
+                            <input type="text" id="formTags" class="form-control" placeholder="Practice area tags">
+                        </div>
+                    </div>
+
+                    <div class="form-checkbox-row mt-2">
+                        <label class="custom-checkbox-label">
+                            <input type="checkbox" id="formLandmark" class="custom-checkbox">
+                            <span>Tag as Authoritative Landmark Precedent</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary" id="btnSaveCase">Save &amp; Index Authority</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Export Intelligence Brief Modal -->
+    <div id="exportBriefModal" class="modal-backdrop hidden" onclick="closeExportModal(event)">
+        <div class="modal-container" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title">Export Legal Intelligence Dossier</h3>
+                    <p class="modal-subtitle">Download structured datasets or produce courtroom-ready intelligence briefs.</p>
+                </div>
+                <button class="modal-close-btn" onclick="closeExportModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="export-options-grid">
+                    <div class="export-card" onclick="exportRepositoryJSON()">
+                        <div class="export-icon-box">
+                            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                        </div>
+                        <h4 class="export-title">Export Repository (JSON)</h4>
+                        <p class="export-desc">Complete structured dataset of all 20+ indexed authorities, holding ratios, and vector metadata.</p>
+                    </div>
+                    <div class="export-card" onclick="printJudicialDossier()">
+                        <div class="export-icon-box">
+                            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                        </div>
+                        <h4 class="export-title">Print Intelligence Dossier</h4>
+                        <p class="export-desc">Generate an executive PDF brief with active prediction, win meters, KPIs, and cited precedents.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+    <!-- Application JavaScript Engine -->
+    <script src="js/app.js"></script>
+</body>
+</html>
