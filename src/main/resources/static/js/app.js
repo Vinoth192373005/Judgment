@@ -104,6 +104,7 @@ function initKeyboardShortcuts() {
             closeDetailsModal();
             closeCaseFormModal();
             closeExportModal();
+            closeCourtListenerModal();
         }
 
         // Keyboard navigation inside Palette
@@ -1228,7 +1229,124 @@ function printJudicialDossier() {
 }
 
 // =========================================================================
-// 12. Utilities & Toast Notifications
+// 12. CourtListener Live API Integration
+// =========================================================================
+
+let cachedClResults = [];
+
+function openCourtListenerModal() {
+    document.getElementById('courtListenerModal').classList.remove('hidden');
+    const input = document.getElementById('clSearchQuery');
+    if (input) {
+        setTimeout(() => input.focus(), 50);
+    }
+}
+
+function closeCourtListenerModal(e) {
+    if (e && e.target !== e.currentTarget && !e.target.classList.contains('modal-close-btn')) return;
+    document.getElementById('courtListenerModal').classList.add('hidden');
+}
+
+async function executeCourtListenerSearch() {
+    const query = document.getElementById('clSearchQuery').value.trim();
+    if (!query) {
+        showToast('Please enter search terms for CourtListener API', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('btnClSearch');
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner"></span> <span>Searching API...</span>`;
+
+    const feed = document.getElementById('clResultsFeed');
+    feed.innerHTML = '<div class="empty-feed-state"><p class="text-muted text-sm">Querying CourtListener API v4 endpoint...</p></div>';
+
+    try {
+        const res = await fetch(`${API_BASE}/courtlistener/search?query=${encodeURIComponent(query)}`);
+        if (!res.ok) throw new Error('Search failed');
+
+        const data = await res.json();
+        cachedClResults = data.results || [];
+
+        if (cachedClResults.length === 0) {
+            feed.innerHTML = '<div class="empty-feed-state"><p class="text-muted text-sm">No matching opinions found on CourtListener for this query.</p></div>';
+            return;
+        }
+
+        feed.innerHTML = cachedClResults.map((c, idx) => `
+            <div class="precedent-card" style="margin-bottom: 12px; cursor: default;">
+                <div class="precedent-header">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                            <span class="pill-chip pill-primary font-mono text-xs">Docket #${escapeHtml(c.docketNumber || 'CL-' + c.id)}</span>
+                            <span class="badge badge-landmark">${escapeHtml(c.court_exact || c.court || 'Federal Court')}</span>
+                            ${c.dateFiled ? `<span class="text-dim text-xs font-mono">${escapeHtml(c.dateFiled)}</span>` : ''}
+                        </div>
+                        <h5 class="precedent-title">${escapeHtml(c.caseName || 'Unnamed Opinion')}</h5>
+                        <p class="precedent-meta">${escapeHtml((c.citation && c.citation.length > 0) ? c.citation.join(', ') : c.court_citation_string || 'Official Citation Pending')} • Judge: ${escapeHtml(c.judge || 'Bench Not Listed')}</p>
+                    </div>
+                    <button class="btn btn-primary btn-sm" id="btnImportCl_${idx}" onclick="importCourtListenerCase(${idx})">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>
+                        <span>Import to Supabase</span>
+                    </button>
+                </div>
+                ${c.snippet ? `<p class="precedent-holding-text" style="font-style: normal; font-family: var(--font-sans); color: var(--text-secondary);">${c.snippet}</p>` : ''}
+            </div>
+        `).join('');
+
+    } catch (err) {
+        console.error(err);
+        feed.innerHTML = '<div class="empty-feed-state"><p style="color: var(--rose-400);" class="text-sm">Unable to connect to CourtListener API. Please check network connection.</p></div>';
+        showToast('CourtListener API query failed', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg> <span>Search API</span>`;
+    }
+}
+
+async function importCourtListenerCase(idx) {
+    const item = cachedClResults[idx];
+    if (!item) return;
+
+    const btn = document.getElementById(`btnImportCl_${idx}`);
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner"></span> <span>Importing...</span>`;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/courtlistener/import`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(item)
+        });
+
+        if (!res.ok) throw new Error('Import failed');
+
+        const savedCase = await res.json();
+        showToast(`Imported "${savedCase.title}" into Supabase!`, 'success');
+
+        if (btn) {
+            btn.className = 'btn btn-secondary btn-sm';
+            btn.innerHTML = `✓ Ingested in Supabase`;
+        }
+
+        // Refresh repository & analytics in background
+        loadRepositoryCases();
+        loadAnalyticsDashboard();
+        populateComparisonDropdowns();
+    } catch (err) {
+        console.error(err);
+        showToast('Failed to import case to Supabase', 'error');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<span>Import to Supabase</span>`;
+        }
+    }
+}
+
+// =========================================================================
+// 13. Utilities & Toast Notifications
 // =========================================================================
 
 function formatEnum(val) {

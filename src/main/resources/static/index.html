@@ -535,6 +535,10 @@
                     <p class="text-muted text-sm" id="repoResultsSubtitle">Displaying all indexed case records in vector repository</p>
                 </div>
                 <div class="view-toggles-wrap">
+                    <button class="btn btn-secondary btn-sm" onclick="openCourtListenerModal()" title="Search millions of live opinions on CourtListener API and import to Supabase">
+                        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                        <span>CourtListener Live API</span>
+                    </button>
                     <button class="btn-view-toggle active" id="btnGridView" onclick="toggleRepoView('grid')" title="Card Grid View">
                         <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
                         <span>Grid</span>
@@ -828,6 +832,41 @@
                         </div>
                         <h4 class="export-title">Print Intelligence Dossier</h4>
                         <p class="export-desc">Generate an executive PDF brief with active prediction, win meters, KPIs, and cited precedents.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CourtListener Live API Modal -->
+    <div id="courtListenerModal" class="modal-backdrop hidden" onclick="closeCourtListenerModal(event)">
+        <div class="modal-container modal-lg" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-badge-row">
+                        <span class="pill-chip pill-primary">CourtListener API v4</span>
+                        <span class="pill-chip pill-subtle">Free Law Project</span>
+                    </div>
+                    <h3 class="modal-title mt-1">Live CourtListener Case Search &amp; Ingestion</h3>
+                    <p class="modal-subtitle">Search millions of live US Supreme Court, Federal Appellate, and State opinions. Ingest directly into Supabase with one click.</p>
+                </div>
+                <button class="modal-close-btn" onclick="closeCourtListenerModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="search-filter-toolbar mb-3">
+                    <div class="search-input-group" style="flex: 1;">
+                        <svg class="search-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <input type="text" id="clSearchQuery" class="form-control search-input" placeholder="Search case name, keyword, statute (e.g. copyright, fair use, privacy)..." onkeydown="if(event.key==='Enter') executeCourtListenerSearch()">
+                    </div>
+                    <button class="btn btn-primary btn-sm" id="btnClSearch" onclick="executeCourtListenerSearch()">
+                        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <span>Search API</span>
+                    </button>
+                </div>
+
+                <div id="clResultsFeed" class="precedents-feed" style="max-height: 480px; overflow-y: auto;">
+                    <div class="empty-feed-state">
+                        <p class="text-muted text-sm">Enter search terms above to query millions of official opinions live from CourtListener.</p>
                     </div>
                 </div>
             </div>
