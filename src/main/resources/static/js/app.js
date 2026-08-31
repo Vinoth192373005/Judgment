@@ -1075,36 +1075,54 @@ async function viewCaseDetailsById(caseId) {
             </div>
 
             <div class="form-group">
-                <label class="form-label">Factual Background &amp; Procedural History</label>
-                <div class="reasoning-dossier-box" style="border-left-color: var(--azure-500);"><p class="reasoning-paragraph">${escapeHtml(c.factsSynopsis)}</p></div>
+                <label class="form-label" style="display: flex; align-items: center; gap: 8px;">
+                    <span>Factual Background &amp; Procedural History</span>
+                </label>
+                <div class="reasoning-dossier-box" style="border-left-color: var(--azure-500); line-height: 1.6; font-size: 13.5px; color: var(--text-primary);">
+                    <p class="reasoning-paragraph" style="white-space: pre-line; margin: 0;">${escapeHtml(c.factsSynopsis)}</p>
+                </div>
             </div>
 
             ${c.legalIssues ? `
             <div class="form-group">
-                <label class="form-label">Questions of Law / Core Issues</label>
-                <div class="reasoning-dossier-box"><p class="reasoning-paragraph">${escapeHtml(c.legalIssues)}</p></div>
+                <label class="form-label" style="display: flex; align-items: center; gap: 8px;">
+                    <span>Questions of Law &amp; Core Issues</span>
+                </label>
+                <div class="reasoning-dossier-box" style="border-left-color: var(--purple-500); line-height: 1.6; font-size: 13.5px; color: var(--text-primary);">
+                    <p class="reasoning-paragraph" style="white-space: pre-line; margin: 0;">${escapeHtml(c.legalIssues)}</p>
+                </div>
             </div>` : ''}
 
             <div class="form-group">
-                <label class="form-label">Ratio Decidendi (Authoritative Legal Holding)</label>
-                <div class="reasoning-dossier-box" style="border-left-color: var(--gold-400);"><p class="reasoning-paragraph" style="font-weight: 600;">${escapeHtml(c.ratioDecidendi)}</p></div>
+                <label class="form-label" style="display: flex; align-items: center; gap: 8px;">
+                    <span>Ratio Decidendi (Authoritative Legal Holding)</span>
+                </label>
+                <div class="reasoning-dossier-box" style="border-left-color: var(--gold-400); line-height: 1.6; font-size: 13.5px;">
+                    <p class="reasoning-paragraph" style="font-weight: 600; color: #f3f4f6; white-space: pre-line; margin: 0;">${escapeHtml(c.ratioDecidendi)}</p>
+                </div>
             </div>
 
-            <div class="form-row">
+            <div class="form-row" style="margin-top: 16px;">
                 <div class="form-group col-6">
                     <label class="form-label">Statutes Cited</label>
-                    <p style="color: var(--azure-400); font-family: var(--font-mono); font-size: 12px;">${escapeHtml(c.statutesCited || 'None recorded')}</p>
+                    <div style="background: rgba(30, 41, 59, 0.6); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-subtle);">
+                        <p style="color: var(--azure-400); font-family: var(--font-mono); font-size: 12px; margin: 0; line-height: 1.5;">${escapeHtml(c.statutesCited || 'None recorded')}</p>
+                    </div>
                 </div>
                 <div class="form-group col-6">
                     <label class="form-label">Precedents Cited</label>
-                    <p style="font-size: 12px; color: var(--text-secondary);">${escapeHtml(c.precedentsCited || 'None recorded')}</p>
+                    <div style="background: rgba(30, 41, 59, 0.6); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-subtle);">
+                        <p style="font-size: 12px; color: var(--text-secondary); margin: 0; line-height: 1.5;">${escapeHtml(c.precedentsCited || 'Supreme Court & Circuit Authorities')}</p>
+                    </div>
                 </div>
             </div>
 
             ${c.sentenceOrDamages ? `
-            <div class="form-group">
-                <label class="form-label">Damages / Sentencing</label>
-                <p style="color: var(--emerald-400); font-weight: 700; font-family: var(--font-mono);">${escapeHtml(c.sentenceOrDamages)}</p>
+            <div class="form-group" style="margin-top: 12px;">
+                <label class="form-label">Damages / Sentencing / Disposition</label>
+                <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); padding: 10px 14px; border-radius: 8px;">
+                    <p style="color: var(--emerald-400); font-weight: 600; font-family: var(--font-mono); font-size: 13px; margin: 0;">${escapeHtml(c.sentenceOrDamages)}</p>
+                </div>
             </div>` : ''}
         `;
 
