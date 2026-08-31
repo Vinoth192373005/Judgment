@@ -86,7 +86,7 @@ public class RecommendationService {
 
     /**
      * Analyzes input case facts and generates top precedent recommendations + outcome predictions
-     * using the same unified dual search logic (Database + CourtListener API).
+     * using unified dual search logic (Database + CourtListener API).
      */
     public RecommendationResult recommend(RecommendationRequest request) {
         if (!isIndexed || caseVectorsCache.isEmpty()) {
@@ -135,6 +135,7 @@ public class RecommendationService {
 
         List<LegalCase> allCases = caseRepository.findAll();
         List<MatchedPrecedent> matches = new ArrayList<>();
+        List<String> queryTokens = textProcessor.tokenize(queryText);
 
         double wFact = request.getFactWeight();
         double wStat = request.getStatuteWeight();
@@ -152,14 +153,25 @@ public class RecommendationService {
                 caseVectorsCache.put(lc.getId(), caseVector);
             }
 
-            // Fact & Legal Issue Similarity (0 - 100)
-            double factSim = vectorizer.cosineSimilarity(queryVector, caseVector) * 100.0;
+            // Fact & Legal Issue Cosine Similarity (0 - 100)
+            double factCosine = vectorizer.cosineSimilarity(queryVector, caseVector) * 100.0;
+
+            // Direct Keyword & Concept Overlap
+            double keywordMatchScore = 0.0;
+            if (!queryTokens.isEmpty()) {
+                String caseAllText = buildCaseSearchableText(lc).toLowerCase();
+                long matchCount = queryTokens.stream().filter(caseAllText::contains).count();
+                keywordMatchScore = ((double) matchCount / queryTokens.size()) * 100.0;
+            }
+
+            // Effective Fact Similarity
+            double factSim = Math.max(factCosine, (factCosine * 0.4) + (keywordMatchScore * 0.6));
 
             // Statute Overlap (0 - 100)
             double statuteSim = vectorizer.computeStatuteOverlap(request.getStatutes(), lc.getStatutesCited()) * 100.0;
 
-            // Strict Relevance Gating: If there is ZERO fact similarity and ZERO statute similarity, exclude
-            if (factSim <= 0.0 && statuteSim <= 0.0) {
+            // Strict Relevance Gating: If there is ZERO fact similarity, ZERO keyword match, and ZERO statute similarity, exclude
+            if (factSim <= 0.0 && statuteSim <= 0.0 && keywordMatchScore <= 0.0) {
                 continue;
             }
 
@@ -169,7 +181,7 @@ public class RecommendationService {
                 if (effectiveDomain == lc.getDomain()) {
                     domainScore = 100.0;
                 } else if (isRelatedDomain(effectiveDomain, lc.getDomain())) {
-                    domainScore = 30.0;
+                    domainScore = 40.0;
                 } else {
                     domainScore = 0.0;
                 }

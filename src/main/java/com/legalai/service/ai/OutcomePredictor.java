@@ -86,14 +86,11 @@ public class OutcomePredictor {
         double topOutcomeWeight = outcomeWeights.getOrDefault(predictedOutcome, 0.0);
         double consensusRatio = totalPrecedentWeight > 0 ? (topOutcomeWeight / totalPrecedentWeight) : 0.6;
         double avgTopScore = topPrecedents.stream().mapToDouble(MatchedPrecedent::getOverallScore).average().orElse(50.0);
+        double topScore = topPrecedents.isEmpty() ? 50.0 : topPrecedents.get(0).getOverallScore();
         double maxFactCosine = topPrecedents.stream().mapToDouble(MatchedPrecedent::getFactSimilarity).max().orElse(0.0);
 
-        // Scale confidence realistically with factual match quality
-        double baseConfidence = (avgTopScore * 0.5) + (consensusRatio * 35.0);
-        if (maxFactCosine < 15.0) {
-            baseConfidence = Math.min(52.0, baseConfidence * 0.8);
-        }
-        double confidence = Math.min(96.5, Math.max(38.0, baseConfidence));
+        double baseConfidence = (topScore * 0.45) + (avgTopScore * 0.25) + (consensusRatio * 30.0);
+        double confidence = Math.min(96.0, Math.max(45.0, baseConfidence));
 
         // Determine Risk Level & Rationale
         String riskLevel;
