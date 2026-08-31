@@ -1,14 +1,15 @@
 package com.legalai.service.ai;
 
+import com.legalai.model.LegalDomain;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * Natural Language Processing component for legal text tokenization,
- * legal stop-word filtering, term normalization, and keyphrase extraction.
+ * legal stop-word filtering, term normalization, keyphrase extraction,
+ * and domain classification.
  */
 @Component
 public class TextProcessor {
@@ -81,6 +82,130 @@ public class TextProcessor {
         }
 
         return phrases;
+    }
+
+    /**
+     * Infers the most appropriate LegalDomain from factual text and statutory citations.
+     */
+    public LegalDomain inferDomain(String text, List<String> statutes) {
+        StringBuilder combined = new StringBuilder();
+        if (text != null) combined.append(text.toLowerCase(Locale.ROOT)).append(" ");
+        if (statutes != null) {
+            for (String s : statutes) {
+                if (s != null) combined.append(s.toLowerCase(Locale.ROOT)).append(" ");
+            }
+        }
+        String corpus = combined.toString();
+
+        Map<LegalDomain, Double> domainScores = new EnumMap<>(LegalDomain.class);
+        for (LegalDomain d : LegalDomain.values()) {
+            domainScores.put(d, 0.0);
+        }
+
+        // 1. Criminal Law
+        scoreKeywords(domainScores, LegalDomain.CRIMINAL, corpus,
+                new String[]{"theft", "car theft", "stolen", "vehicle theft", "robbery", "dacoity", "burglary",
+                        "larceny", "extortion", "murder", "homicide", "ipc 302", "ipc 378", "ipc 379", "section 378",
+                        "section 379", "section 411", "section 420", "stolen vehicle", "fir", "police", "accused",
+                        "convict", "bail", "charge sheet", "penal code", "criminal", "assault", "narcotics", "ndps",
+                        "crpc", "acquittal", "custodial", "culpable homicide", "death penalty", "rarest of rare"},
+                new double[]{6.0, 12.0, 6.0, 12.0, 6.0, 6.0, 6.0,
+                        6.0, 6.0, 6.0, 6.0, 8.0, 8.0, 8.0, 8.0,
+                        8.0, 8.0, 8.0, 10.0, 4.0, 3.0, 3.0,
+                        3.0, 4.0, 4.0, 4.0, 3.0, 3.0, 4.0, 4.0,
+                        3.0, 3.0, 4.0, 6.0, 6.0, 6.0});
+
+        // 2. Civil & Tort Law
+        scoreKeywords(domainScores, LegalDomain.CIVIL_TORT, corpus,
+                new String[]{"motor accident", "vehicular accident", "vehicle damage", "motor vehicle", "mv act",
+                        "insurance claim", "surveyor", "repudiation", "own damage", "third party", "negligence",
+                        "medical negligence", "malpractice", "doctor", "hospital", "consumer protection", "deficiency in service",
+                        "personal injury", "tort", "compensation", "multiplier", "fatal accident", "collision"},
+                new double[]{8.0, 8.0, 8.0, 6.0, 6.0,
+                        6.0, 5.0, 5.0, 6.0, 5.0, 4.0,
+                        8.0, 6.0, 3.0, 3.0, 7.0, 7.0,
+                        5.0, 4.0, 3.0, 5.0, 6.0, 5.0});
+
+        // 3. Cyber & Media Law (Privacy / Intermediary)
+        scoreKeywords(domainScores, LegalDomain.CYBER_DEFAMATION, corpus,
+                new String[]{"privacy", "right to privacy", "surveillance", "biometric", "aadhaar", "interception",
+                        "wiretap", "cyber", "it act", "section 66a", "section 69", "defamation", "libel", "slander",
+                        "data protection", "gdpr", "social media", "intermediary liability", "encryption", "informational privacy"},
+                new double[]{6.0, 9.0, 7.0, 7.0, 7.0, 6.0,
+                        6.0, 5.0, 6.0, 8.0, 8.0, 6.0, 6.0, 6.0,
+                        6.0, 6.0, 5.0, 7.0, 6.0, 8.0});
+
+        // 4. Constitutional Law
+        scoreKeywords(domainScores, LegalDomain.CONSTITUTIONAL, corpus,
+                new String[]{"fundamental right", "article 21", "article 19", "article 14", "article 32", "article 226",
+                        "article 368", "basic structure", "writ", "habeas corpus", "mandamus", "certiorari",
+                        "judicial review", "constitutional", "unconstitutional", "ultra vires", "state action", "proportionality standard"},
+                new double[]{7.0, 7.0, 7.0, 7.0, 7.0, 7.0,
+                        8.0, 9.0, 5.0, 6.0, 6.0, 6.0,
+                        6.0, 4.0, 5.0, 5.0, 4.0, 6.0});
+
+        // 5. Intellectual Property
+        scoreKeywords(domainScores, LegalDomain.INTELLECTUAL_PROPERTY, corpus,
+                new String[]{"copyright", "patent", "trademark", "fair use", "infringement", "software", "api",
+                        "declaring code", "licensing", "trade secret", "intellectual property", "royalty", "section 107", "transformative"},
+                new double[]{7.0, 7.0, 7.0, 7.0, 5.0, 5.0, 6.0,
+                        8.0, 4.0, 6.0, 7.0, 5.0, 7.0, 6.0});
+
+        // 6. Corporate & Commercial
+        scoreKeywords(domainScores, LegalDomain.CORPORATE_COMMERCIAL, corpus,
+                new String[]{"contract", "breach of contract", "liquidated damages", "section 73", "section 74",
+                        "contract act", "arbitration", "arbitral award", "shareholder", "merger", "acquisition",
+                        "insolvency", "ibc", "promissory", "indemnity", "commercial contract", "consequential damages", "remoteness"},
+                new double[]{4.0, 7.0, 8.0, 7.0, 7.0,
+                        6.0, 6.0, 6.0, 5.0, 5.0, 5.0,
+                        6.0, 6.0, 4.0, 4.0, 6.0, 6.0, 6.0});
+
+        // 7. Labor & Employment
+        scoreKeywords(domainScores, LegalDomain.LABOR_EMPLOYMENT, corpus,
+                new String[]{"worker", "employee", "employment", "wage", "minimum wage", "salary", "overtime",
+                        "labor", "labour", "trade union", "wrongful termination", "dismissal", "gig economy", "rideshare", "holiday pay"},
+                new double[]{4.0, 4.0, 4.0, 5.0, 7.0, 4.0, 5.0,
+                        4.0, 4.0, 5.0, 7.0, 5.0, 7.0, 6.0, 6.0});
+
+        // 8. Environmental
+        scoreKeywords(domainScores, LegalDomain.ENVIRONMENTAL, corpus,
+                new String[]{"environment", "pollution", "gas leak", "hazardous", "absolute liability", "toxic",
+                        "effluent", "emission", "ngt", "green tribunal", "air pollution", "water pollution", "polluter pays"},
+                new double[]{5.0, 6.0, 8.0, 6.0, 8.0, 6.0,
+                        6.0, 6.0, 6.0, 6.0, 6.0, 6.0, 7.0});
+
+        // 9. Tax & Financial
+        scoreKeywords(domainScores, LegalDomain.TAX_FINANCIAL, corpus,
+                new String[]{"income tax", "gst", "customs", "excise", "revenue", "tax evasion", "assessment",
+                        "securities", "sebi", "money laundering", "pmla", "financial regulation"},
+                new double[]{7.0, 7.0, 6.0, 6.0, 4.0, 7.0, 5.0,
+                        5.0, 6.0, 7.0, 7.0, 5.0});
+
+        // 10. Family & Estate
+        scoreKeywords(domainScores, LegalDomain.FAMILY_ESTATE, corpus,
+                new String[]{"divorce", "custody", "matrimonial", "maintenance", "alimony", "inheritance",
+                        "succession", "probate", "will", "ancestral property", "matrimonial property"},
+                new double[]{7.0, 7.0, 6.0, 6.0, 6.0, 6.0,
+                        6.0, 7.0, 5.0, 7.0, 6.0});
+
+        // Find domain with maximum score
+        Map.Entry<LegalDomain, Double> best = Collections.max(domainScores.entrySet(), Map.Entry.comparingByValue());
+        if (best.getValue() > 0.0) {
+            return best.getKey();
+        }
+
+        return null;
+    }
+
+    private void scoreKeywords(Map<LegalDomain, Double> domainScores, LegalDomain domain, String corpus, String[] keywords, double[] weights) {
+        double current = domainScores.getOrDefault(domain, 0.0);
+        for (int i = 0; i < keywords.length; i++) {
+            String kw = keywords[i].toLowerCase(Locale.ROOT);
+            if (corpus.contains(kw)) {
+                current += weights[i];
+            }
+        }
+        domainScores.put(domain, current);
     }
 
     /**

@@ -13,6 +13,7 @@ public class RecommendationResult {
     private List<String> keyStatutesToCite;
     private List<String> riskFactors;
     private String analyticalSummary;
+    private LegalDomain inferredDomain;
 
     public RecommendationResult() {
     }
@@ -74,6 +75,14 @@ public class RecommendationResult {
 
     public void setAnalyticalSummary(String analyticalSummary) {
         this.analyticalSummary = analyticalSummary;
+    }
+
+    public LegalDomain getInferredDomain() {
+        return inferredDomain;
+    }
+
+    public void setInferredDomain(LegalDomain inferredDomain) {
+        this.inferredDomain = inferredDomain;
     }
 
     /**

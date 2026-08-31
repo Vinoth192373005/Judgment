@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
 
 /**
  * AI Judgment Recommendation Service providing multi-factor precedent matching,
- * outcome prediction, and legal pleading arguments.
+ * domain auto-classification, outcome prediction, and legal pleading arguments.
  */
 @Service
 public class RecommendationService {
@@ -82,6 +82,16 @@ public class RecommendationService {
                 + (request.getLegalIssues() != null ? request.getLegalIssues() : "");
         Map<String, Double> queryVector = vectorizer.vectorize(queryText, idfCache);
 
+        // Auto-infer domain if not explicitly provided
+        LegalDomain explicitDomain = request.getDomain();
+        LegalDomain effectiveDomain = explicitDomain;
+        if (effectiveDomain == null) {
+            effectiveDomain = textProcessor.inferDomain(queryText, request.getStatutes());
+            if (effectiveDomain != null) {
+                request.setDomain(effectiveDomain);
+            }
+        }
+
         List<MatchedPrecedent> matches = new ArrayList<>();
 
         for (LegalCase lc : allCases) {
@@ -99,15 +109,17 @@ public class RecommendationService {
             double statuteSim = vectorizer.computeStatuteOverlap(request.getStatutes(), lc.getStatutesCited()) * 100.0;
 
             // 3. Domain Alignment Score (0 - 100)
-            double domainScore = 20.0;
-            if (request.getDomain() != null) {
-                if (request.getDomain() == lc.getDomain()) {
+            double domainScore = 0.0;
+            if (effectiveDomain != null) {
+                if (effectiveDomain == lc.getDomain()) {
                     domainScore = 100.0;
-                } else if (isRelatedDomain(request.getDomain(), lc.getDomain())) {
-                    domainScore = 60.0;
+                } else if (isRelatedDomain(effectiveDomain, lc.getDomain())) {
+                    domainScore = 30.0;
+                } else {
+                    domainScore = 0.0;
                 }
             } else {
-                domainScore = 70.0; // neutral if no domain specified
+                domainScore = 50.0; // neutral if no domain could be inferred or specified
             }
 
             // 4. Court Precedent Weight (0 - 100)
@@ -116,7 +128,7 @@ public class RecommendationService {
                 courtScore = Math.min(100.0, courtScore + 15.0);
             }
 
-            // Calculate Weighted Overall Score
+            // Calculate Weighted Overall Score with Relevance Gating
             double wFact = request.getFactWeight();
             double wStat = request.getStatuteWeight();
             double wDom = request.getDomainWeight();
@@ -126,31 +138,50 @@ public class RecommendationService {
 
             double landmarkBoost = lc.isLandmarkCase() ? 100.0 : (Math.min(100.0, lc.getCitationCount() * 10.0));
 
-            double overallScore = (
-                    (factSim * wFact) +
-                    (statuteSim * wStat) +
-                    (domainScore * wDom) +
-                    (courtScore * wCourt) +
-                    (landmarkBoost * wPrec)
-            ) / sumWeights;
+            double overallScore;
 
-            // Determine if binding on target court
-            boolean isBinding = isBindingPrecedent(lc.getCourtLevel(), request.getTargetCourtLevel());
+            if (factSim == 0.0 && statuteSim == 0.0) {
+                // If completely unrelated domain or non-matching domain, score is 0
+                if (domainScore < 100.0) {
+                    overallScore = 0.0;
+                } else {
+                    // Same domain, but no specific fact/statute match: minimal domain baseline
+                    overallScore = 5.0;
+                }
+            } else if (domainScore == 0.0 && factSim < 15.0 && statuteSim < 20.0) {
+                // Different domain with negligible overlap is filtered out
+                overallScore = 0.0;
+            } else {
+                // Relevant match: apply full weighted formula
+                overallScore = (
+                        (factSim * wFact) +
+                        (statuteSim * wStat) +
+                        (domainScore * wDom) +
+                        (courtScore * wCourt) +
+                        (landmarkBoost * wPrec)
+                ) / sumWeights;
+            }
 
-            String rationale = generateMatchRationale(lc, factSim, statuteSim, request);
-            String takeaway = extractTakeaway(lc);
+            // Only consider authorities that have genuine relevance (score > 0.0)
+            if (overallScore > 0.0) {
+                // Determine if binding on target court
+                boolean isBinding = isBindingPrecedent(lc.getCourtLevel(), request.getTargetCourtLevel());
 
-            matches.add(new MatchedPrecedent(
-                    lc,
-                    Math.round(overallScore * 10.0) / 10.0,
-                    Math.round(factSim * 10.0) / 10.0,
-                    Math.round(statuteSim * 10.0) / 10.0,
-                    Math.round(domainScore * 10.0) / 10.0,
-                    Math.round(courtScore * 10.0) / 10.0,
-                    rationale,
-                    takeaway,
-                    isBinding
-            ));
+                String rationale = generateMatchRationale(lc, factSim, statuteSim, effectiveDomain, request);
+                String takeaway = extractTakeaway(lc);
+
+                matches.add(new MatchedPrecedent(
+                        lc,
+                        Math.round(overallScore * 10.0) / 10.0,
+                        Math.round(factSim * 10.0) / 10.0,
+                        Math.round(statuteSim * 10.0) / 10.0,
+                        Math.round(domainScore * 10.0) / 10.0,
+                        Math.round(courtScore * 10.0) / 10.0,
+                        rationale,
+                        takeaway,
+                        isBinding
+                ));
+            }
         }
 
         // Sort descending by overall score
@@ -172,7 +203,7 @@ public class RecommendationService {
                 allCases.size(), topPrecedents.size(),
                 topPrecedents.stream().mapToDouble(MatchedPrecedent::getOverallScore).average().orElse(0.0));
 
-        return new RecommendationResult(
+        RecommendationResult result = new RecommendationResult(
                 topPrecedents,
                 prediction,
                 suggestedArguments,
@@ -180,6 +211,9 @@ public class RecommendationService {
                 riskFactors,
                 summary
         );
+        result.setInferredDomain(effectiveDomain);
+
+        return result;
     }
 
     private String buildCaseSearchableText(LegalCase lc) {
@@ -196,9 +230,9 @@ public class RecommendationService {
     private boolean isRelatedDomain(LegalDomain d1, LegalDomain d2) {
         if (d1 == null || d2 == null) return false;
         if ((d1 == LegalDomain.CYBER_DEFAMATION && d2 == LegalDomain.INTELLECTUAL_PROPERTY) ||
-            (d1 == LegalDomain.INTELLECTUAL_PROPERTY && d2 == LegalDomain.CORPORATE_COMMERCIAL) ||
-            (d1 == LegalDomain.CONSTITUTIONAL && d2 == LegalDomain.CRIMINAL) ||
-            (d1 == LegalDomain.CIVIL_TORT && d2 == LegalDomain.ENVIRONMENTAL)) {
+            (d1 == LegalDomain.INTELLECTUAL_PROPERTY && d2 == LegalDomain.CYBER_DEFAMATION) ||
+            (d1 == LegalDomain.CIVIL_TORT && d2 == LegalDomain.ENVIRONMENTAL) ||
+            (d1 == LegalDomain.ENVIRONMENTAL && d2 == LegalDomain.CIVIL_TORT)) {
             return true;
         }
         return false;
@@ -211,15 +245,17 @@ public class RecommendationService {
         return precedentLevel.ordinal() <= targetLevel.ordinal();
     }
 
-    private String generateMatchRationale(LegalCase lc, double factSim, double statSim, RecommendationRequest request) {
+    private String generateMatchRationale(LegalCase lc, double factSim, double statSim, LegalDomain domain, RecommendationRequest request) {
         if (statSim > 40.0 && factSim > 30.0) {
             return "Strong direct alignment in statutory provisions and underlying transactional/factual matrices.";
-        } else if (lc.isLandmarkCase()) {
-            return "Landmark authority establishing binding judicial principles and legal interpretation.";
         } else if (factSim > 35.0) {
             return "Substantial factual analogy regarding core conduct, liability triggers, and legal issues.";
         } else if (statSim > 30.0) {
             return "Shared statutory focus providing persuasive interpretive guidelines.";
+        } else if (lc.isLandmarkCase() && (factSim > 10.0 || statSim > 15.0)) {
+            return "Landmark authority establishing binding judicial principles and legal interpretation.";
+        } else if (domain != null && lc.getDomain() == domain) {
+            return "Authoritative precedent within the matching " + lc.getDomain().getDisplayName() + " jurisprudence.";
         } else {
             return "Persuasive comparative precedent within corresponding jurisdictional jurisprudence.";
         }
@@ -244,7 +280,7 @@ public class RecommendationService {
             args.add(String.format("Plead statutory violation under %s, emphasizing continuous harm and strict liability standards.",
                     String.join(" and ", request.getStatutes())));
         } else {
-            args.add("Plead breach of fiduciary duty and violation of statutory due diligence guidelines.");
+            args.add("Plead breach of statutory duty and violation of mandatory regulatory guidelines.");
         }
 
         args.add("Highlight proportional remedy and injunctive relief to prevent irreparable damages pending final adjudication.");

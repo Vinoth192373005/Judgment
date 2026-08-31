@@ -2,6 +2,7 @@ package com.legalai.service;
 
 import com.legalai.model.*;
 import com.legalai.repository.LegalCaseRepository;
+import com.legalai.service.ai.TextProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,7 +17,7 @@ import java.util.Collections;
 
 /**
  * Service for querying the CourtListener Search API and importing
- * authoritative case opinions directly into the Supabase database.
+ * authoritative case opinions directly into the database.
  */
 @Service
 public class CourtListenerService {
@@ -26,14 +27,18 @@ public class CourtListenerService {
 
     private final LegalCaseRepository caseRepository;
     private final RecommendationService recommendationService;
+    private final TextProcessor textProcessor;
     private final RestTemplate restTemplate;
 
     @Value("${courtlistener.api.token:}")
     private String apiToken;
 
-    public CourtListenerService(LegalCaseRepository caseRepository, RecommendationService recommendationService) {
+    public CourtListenerService(LegalCaseRepository caseRepository, 
+                                RecommendationService recommendationService,
+                                TextProcessor textProcessor) {
         this.caseRepository = caseRepository;
         this.recommendationService = recommendationService;
+        this.textProcessor = textProcessor;
         this.restTemplate = new RestTemplate();
     }
 
@@ -83,7 +88,7 @@ public class CourtListenerService {
     }
 
     /**
-     * Converts and imports a CourtListener opinion into the Supabase database.
+     * Converts and imports a CourtListener opinion into the database.
      *
      * @param dto CourtListener opinion record
      * @return Saved LegalCase
@@ -160,7 +165,7 @@ public class CourtListenerService {
             legalCase.setKeyTags("CourtListener, Federal Law, " + (dto.getSuitNature() != null ? dto.getSuitNature() : "Precedent"));
 
             LegalCase saved = caseRepository.save(legalCase);
-            log.info("Imported case '{}' ({}) into Supabase repository.", saved.getTitle(), saved.getCaseNumber());
+            log.info("Imported case '{}' ({}) into database repository.", saved.getTitle(), saved.getCaseNumber());
 
             // Reindex vector corpus so the new case is immediately searchable
             recommendationService.reindexCorpus();
@@ -173,22 +178,9 @@ public class CourtListenerService {
                 (dto.getSuitNature() != null ? dto.getSuitNature() : "") + " " +
                 (dto.getSnippet() != null ? dto.getSnippet() : "")).toLowerCase();
 
-        if (combined.contains("copyright") || combined.contains("patent") || combined.contains("trademark") || combined.contains("fair use")) {
-            return LegalDomain.INTELLECTUAL_PROPERTY;
-        } else if (combined.contains("criminal") || combined.contains("murder") || combined.contains("fraud") || combined.contains("wire fraud") || combined.contains("conspiracy")) {
-            return LegalDomain.CRIMINAL;
-        } else if (combined.contains("environment") || combined.contains("pollution") || combined.contains("clean air") || combined.contains("clean water")) {
-            return LegalDomain.ENVIRONMENTAL;
-        } else if (combined.contains("tax") || combined.contains("revenue") || combined.contains("internal revenue") || combined.contains("irs")) {
-            return LegalDomain.TAX_FINANCIAL;
-        } else if (combined.contains("labor") || combined.contains("employment") || combined.contains("wage") || combined.contains("overtime") || combined.contains("worker")) {
-            return LegalDomain.LABOR_EMPLOYMENT;
-        } else if (combined.contains("constitutional") || combined.contains("first amendment") || combined.contains("fourth amendment") || combined.contains("fourteenth amendment") || combined.contains("due process")) {
-            return LegalDomain.CONSTITUTIONAL;
-        } else if (combined.contains("cyber") || combined.contains("defamation") || combined.contains("libel") || combined.contains("privacy")) {
-            return LegalDomain.CYBER_DEFAMATION;
-        } else if (combined.contains("probate") || combined.contains("estate") || combined.contains("divorce") || combined.contains("custody")) {
-            return LegalDomain.FAMILY_ESTATE;
+        LegalDomain inferred = textProcessor.inferDomain(combined, Collections.emptyList());
+        if (inferred != null) {
+            return inferred;
         }
         return LegalDomain.CORPORATE_COMMERCIAL;
     }

@@ -407,15 +407,36 @@ function renderRecommendationResults(result) {
     // Top Precedents List
     const precedentsList = document.getElementById('precedentsList');
     if (!result.topPrecedents || result.topPrecedents.length === 0) {
-        precedentsList.innerHTML = '<div class="empty-feed-state"><p class="text-muted text-sm">No authoritative precedents matched this factual matrix.</p></div>';
+        document.getElementById('precedentsSummaryCount').textContent = '0 Precedents in Database';
+        precedentsList.innerHTML = `
+            <div class="empty-feed-state" style="padding: 24px 16px; text-align: center;">
+                <p class="text-muted text-sm mb-2">No direct precedent authorities matched this specific factual matrix in local DB.</p>
+                <p class="text-xs text-dim mb-3">Query live CourtListener API to search and import federal and appellate opinions.</p>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="switchTab('courtlistenerTab'); document.getElementById('clSearchInput').value = (document.getElementById('inputFacts').value || '').substring(0, 60); handleCourtListenerSearch();">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+                    <span>Search CourtListener Live API</span>
+                </button>
+            </div>`;
     } else {
         document.getElementById('precedentsSummaryCount').textContent = `${result.topPrecedents.length} High-Affinity Authorities Retrieved`;
-        precedentsList.innerHTML = result.topPrecedents.map((mp, idx) => `
+        precedentsList.innerHTML = result.topPrecedents.map((mp, idx) => {
+            let matchBadge = `<span class="pill-chip pill-primary font-mono text-xs">#${idx + 1} Cosine Match</span>`;
+            if (mp.factSimilarity > 0) {
+                matchBadge = `<span class="pill-chip pill-primary font-mono text-xs">#${idx + 1} Cosine Match (${mp.factSimilarity}%)</span>`;
+            } else if (mp.statuteSimilarity > 0) {
+                matchBadge = `<span class="pill-chip pill-secondary font-mono text-xs">#${idx + 1} Statute Overlap (${mp.statuteSimilarity}%)</span>`;
+            } else if (mp.domainScore >= 80) {
+                matchBadge = `<span class="pill-chip pill-secondary font-mono text-xs">#${idx + 1} Domain Authority</span>`;
+            } else {
+                matchBadge = `<span class="pill-chip pill-secondary font-mono text-xs">#${idx + 1} Comparative Precedent</span>`;
+            }
+
+            return `
             <div class="precedent-card" onclick="viewCaseDetailsById(${mp.legalCase.id})">
                 <div class="precedent-header">
                     <div>
                         <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
-                            <span class="pill-chip pill-primary font-mono text-xs">#${idx + 1} Cosine Match</span>
+                            ${matchBadge}
                             ${mp.bindingPrecedent ? '<span class="badge badge-binding">Binding Authority</span>' : ''}
                             ${mp.legalCase.landmarkCase ? '<span class="badge badge-landmark">★ Landmark</span>' : ''}
                         </div>
@@ -456,7 +477,8 @@ function renderRecommendationResults(result) {
                     <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); viewCaseDetailsById(${mp.legalCase.id})">View Case Brief</button>
                 </div>
             </div>
-        `).join('');
+        `;
+        }).join('');
     }
 
     // Arguments & Statutes
