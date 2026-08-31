@@ -103,7 +103,6 @@ function initKeyboardShortcuts() {
             closeCommandPalette();
             closeDetailsModal();
             closeCaseFormModal();
-            closeExportModal();
             closeCourtListenerModal();
         }
 
@@ -163,7 +162,6 @@ function handlePaletteSearch() {
         { label: 'Explore Case Repository Directory', tag: 'Repository', action: () => switchTab('repositoryTab') },
         { label: 'Open Comparative Jurisprudence Matrix', tag: 'Matrix', action: () => switchTab('comparisonTab') },
         { label: 'Formulate New Case Authority', tag: 'Intake', action: () => openNewCaseModal() },
-        { label: 'Export Intelligence Brief / JSON Dataset', tag: 'Export', action: () => openExportModal() },
         { label: 'Toggle Light / Dark Interface Theme', tag: 'Theme', action: () => toggleTheme() }
     ];
 
@@ -1377,45 +1375,7 @@ function renderComparisonMatrix(comp) {
 }
 
 // =========================================================================
-// 11. Export Modal & Helpers
-// =========================================================================
-
-function openExportModal() {
-    document.getElementById('exportBriefModal').classList.remove('hidden');
-}
-
-function closeExportModal(e) {
-    if (e && e.target !== e.currentTarget && !e.target.classList.contains('modal-close-btn')) return;
-    document.getElementById('exportBriefModal').classList.add('hidden');
-}
-
-async function exportRepositoryJSON() {
-    try {
-        const res = await fetch(`${API_BASE}/cases`);
-        const cases = await res.json();
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(cases, null, 2));
-        const dlAnchor = document.createElement('a');
-        dlAnchor.setAttribute("href", dataStr);
-        dlAnchor.setAttribute("download", `legal_cases_repository_${new Date().toISOString().slice(0, 10)}.json`);
-        document.body.appendChild(dlAnchor);
-        dlAnchor.click();
-        dlAnchor.remove();
-        showToast('Repository JSON exported successfully!', 'success');
-        closeExportModal();
-    } catch (err) {
-        showToast('Export failed', 'error');
-    }
-}
-
-function printJudicialDossier() {
-    closeExportModal();
-    setTimeout(() => {
-        window.print();
-    }, 150);
-}
-
-// =========================================================================
-// 12. CourtListener Live API Integration
+// 11. CourtListener Live API Integration
 // =========================================================================
 
 let cachedClResults = [];
