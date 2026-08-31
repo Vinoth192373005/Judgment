@@ -59,6 +59,39 @@ public class TextProcessor {
     }
 
     /**
+     * Extracts clean, concise search keywords suitable for querying CourtListener and database repository.
+     */
+    public String extractSearchKeywords(String text) {
+        if (text == null || text.isBlank()) {
+            return "";
+        }
+        String clean = text.trim();
+        // If short, return as is
+        if (clean.length() <= 50) {
+            return clean;
+        }
+        // Take first sentence or up to first punctuation
+        int punctIdx = -1;
+        for (int i = 0; i < clean.length(); i++) {
+            char c = clean.charAt(i);
+            if (c == '.' || c == '\n' || c == ';') {
+                punctIdx = i;
+                break;
+            }
+        }
+        if (punctIdx > 0 && punctIdx <= 60) {
+            return clean.substring(0, punctIdx).trim();
+        }
+        // Extract top tokens
+        List<String> tokens = tokenize(clean);
+        if (tokens.isEmpty()) {
+            return clean.substring(0, Math.min(50, clean.length())).trim();
+        }
+        int count = Math.min(5, tokens.size());
+        return String.join(" ", tokens.subList(0, count));
+    }
+
+    /**
      * Extracts token frequency map from text.
      */
     public Map<String, Integer> getTermFrequencies(String text) {
