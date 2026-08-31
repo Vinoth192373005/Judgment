@@ -100,10 +100,6 @@
                     <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
                     <span>Case Repository Explorer</span>
                 </button>
-                <button class="tab-btn" data-tab="comparisonTab" onclick="switchTab('comparisonTab')">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"></path></svg>
-                    <span>Comparative Jurisprudence Matrix</span>
-                </button>
             </div>
         </nav>
     </header>
@@ -569,62 +565,6 @@
                             <!-- Dynamically populated -->
                         </tbody>
                     </table>
-                </div>
-            </div>
-        </section>
-
-
-        <!-- ================================================================= -->
-        <!-- TAB 4: CASE COMPARISON MATRIX MODULE                              -->
-        <!-- ================================================================= -->
-        <section id="comparisonTab" class="tab-content">
-            <div class="card mb-4">
-                <div class="card-header border-bottom">
-                    <div>
-                        <h4 class="card-title-lg">Side-by-Side Comparative Jurisprudence Matrix</h4>
-                        <p class="card-subtitle">Select 2 to 3 judicial authorities to align factual matrices, legal questions, ratio decidendi, and outcomes.</p>
-                    </div>
-                </div>
-                <div class="comparison-selectors-row">
-                    <div class="selector-box">
-                        <label class="form-label">Authority #1 <span class="required">*</span></label>
-                        <select id="compareCase1" class="form-control form-select" onchange="runCaseComparison()">
-                            <option value="">-- Choose First Case --</option>
-                        </select>
-                    </div>
-                    <div class="selector-box">
-                        <label class="form-label">Authority #2 <span class="required">*</span></label>
-                        <select id="compareCase2" class="form-control form-select" onchange="runCaseComparison()">
-                            <option value="">-- Choose Second Case --</option>
-                        </select>
-                    </div>
-                    <div class="selector-box">
-                        <label class="form-label">Authority #3 (Optional)</label>
-                        <select id="compareCase3" class="form-control form-select" onchange="runCaseComparison()">
-                            <option value="">-- None --</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Comparison Results Matrix -->
-            <div id="comparisonResultsContainer">
-                <div class="card placeholder-state-matrix" id="comparisonPlaceholder">
-                    <div class="placeholder-icon">⚖</div>
-                    <h4>Select at least 2 case authorities above to generate side-by-side comparative analysis.</h4>
-                </div>
-
-                <div id="comparisonContent" class="hidden">
-                    <div class="card mb-4 synthesis-card">
-                        <div class="card-header border-bottom">
-                            <h5 class="card-title-md">Comparative Jurisprudential Synthesis</h5>
-                        </div>
-                        <p id="comparisonSynthesisText" class="synthesis-body"></p>
-                    </div>
-
-                    <div class="comparison-columns-grid" id="comparisonColumns">
-                        <!-- Dynamically populated columns -->
-                    </div>
                 </div>
             </div>
         </section>

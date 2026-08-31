@@ -160,7 +160,6 @@ function handlePaletteSearch() {
         { label: 'Switch to AI Recommendation & Prediction Studio', tag: 'Studio', action: () => switchTab('recommendationTab') },
         { label: 'Open Judicial Analytics Dashboard', tag: 'Analytics', action: () => switchTab('analyticsTab') },
         { label: 'Explore Case Repository Directory', tag: 'Repository', action: () => switchTab('repositoryTab') },
-        { label: 'Open Comparative Jurisprudence Matrix', tag: 'Matrix', action: () => switchTab('comparisonTab') },
         { label: 'Formulate New Case Authority', tag: 'Intake', action: () => openNewCaseModal() },
         { label: 'Toggle Light / Dark Interface Theme', tag: 'Theme', action: () => toggleTheme() }
     ];
