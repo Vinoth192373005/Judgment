@@ -6,6 +6,9 @@ import com.legalai.repository.LegalCaseRepository;
 import com.legalai.service.ai.OutcomePredictor;
 import com.legalai.service.ai.TFIDFVectorizer;
 import com.legalai.service.ai.TextProcessor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -14,15 +17,18 @@ import java.util.stream.Collectors;
 
 /**
  * AI Judgment Recommendation Service providing multi-factor precedent matching,
- * domain auto-classification, outcome prediction, and legal pleading arguments.
+ * domain auto-classification, live CourtListener integration, outcome prediction, and legal pleading arguments.
  */
 @Service
 public class RecommendationService {
+
+    private static final Logger log = LoggerFactory.getLogger(RecommendationService.class);
 
     private final LegalCaseRepository caseRepository;
     private final TFIDFVectorizer vectorizer;
     private final TextProcessor textProcessor;
     private final OutcomePredictor outcomePredictor;
+    private final ObjectProvider<CourtListenerService> courtListenerServiceProvider;
 
     // In-memory cache for corpus IDF and document vectors
     private final Map<Long, Map<String, Double>> caseVectorsCache = new ConcurrentHashMap<>();
@@ -32,11 +38,13 @@ public class RecommendationService {
     public RecommendationService(LegalCaseRepository caseRepository,
                                  TFIDFVectorizer vectorizer,
                                  TextProcessor textProcessor,
-                                 OutcomePredictor outcomePredictor) {
+                                 OutcomePredictor outcomePredictor,
+                                 ObjectProvider<CourtListenerService> courtListenerServiceProvider) {
         this.caseRepository = caseRepository;
         this.vectorizer = vectorizer;
         this.textProcessor = textProcessor;
         this.outcomePredictor = outcomePredictor;
+        this.courtListenerServiceProvider = courtListenerServiceProvider;
     }
 
     /**
@@ -65,6 +73,17 @@ public class RecommendationService {
     }
 
     /**
+     * Incrementally indexes a single newly imported or updated case into the vector cache.
+     */
+    public synchronized void indexCase(LegalCase lc) {
+        if (lc != null && lc.getId() != null) {
+            String combinedText = buildCaseSearchableText(lc);
+            Map<String, Double> vector = vectorizer.vectorize(combinedText, idfCache);
+            this.caseVectorsCache.put(lc.getId(), vector);
+        }
+    }
+
+    /**
      * Analyzes input case facts and generates top precedent recommendations + outcome predictions.
      */
     public RecommendationResult recommend(RecommendationRequest request) {
@@ -73,9 +92,6 @@ public class RecommendationService {
         }
 
         List<LegalCase> allCases = caseRepository.findAll();
-        if (allCases.isEmpty()) {
-            return new RecommendationResult(Collections.emptyList(), null, Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), "Repository is empty.");
-        }
 
         // Vectorize query
         String queryText = (request.getFactsSynopsis() != null ? request.getFactsSynopsis() : "") + " "
@@ -94,6 +110,14 @@ public class RecommendationService {
 
         List<MatchedPrecedent> matches = new ArrayList<>();
 
+        double wFact = request.getFactWeight();
+        double wStat = request.getStatuteWeight();
+        double wDom = request.getDomainWeight();
+        double wCourt = request.getCourtWeight();
+        double wPrec = request.getPrecedentWeight();
+        double sumWeights = wFact + wStat + wDom + wCourt + wPrec;
+
+        // 1. Evaluate local repository cases
         for (LegalCase lc : allCases) {
             Map<String, Double> caseVector = caseVectorsCache.get(lc.getId());
             if (caseVector == null) {
@@ -102,13 +126,18 @@ public class RecommendationService {
                 caseVectorsCache.put(lc.getId(), caseVector);
             }
 
-            // 1. Fact & Legal Issue Similarity (0 - 100)
+            // Fact & Legal Issue Similarity (0 - 100)
             double factSim = vectorizer.cosineSimilarity(queryVector, caseVector) * 100.0;
 
-            // 2. Statute Overlap (0 - 100)
+            // Statute Overlap (0 - 100)
             double statuteSim = vectorizer.computeStatuteOverlap(request.getStatutes(), lc.getStatutesCited()) * 100.0;
 
-            // 3. Domain Alignment Score (0 - 100)
+            // Strict Relevance Gating: If there is ZERO fact similarity and ZERO statute similarity, score is 0.0
+            if (factSim <= 0.0 && statuteSim <= 0.0) {
+                continue;
+            }
+
+            // Domain Alignment Score (0 - 100)
             double domainScore = 0.0;
             if (effectiveDomain != null) {
                 if (effectiveDomain == lc.getDomain()) {
@@ -119,54 +148,32 @@ public class RecommendationService {
                     domainScore = 0.0;
                 }
             } else {
-                domainScore = 50.0; // neutral if no domain could be inferred or specified
+                domainScore = 50.0;
             }
 
-            // 4. Court Precedent Weight (0 - 100)
+            // If non-matching domain has weak fact/statute overlap, filter out
+            if (domainScore == 0.0 && factSim < 15.0 && statuteSim < 20.0) {
+                continue;
+            }
+
+            // Court Precedent Weight (0 - 100)
             double courtScore = (lc.getCourtLevel() != null ? lc.getCourtLevel().getPrecedentWeight() : 0.6) * 100.0;
             if (lc.isLandmarkCase()) {
                 courtScore = Math.min(100.0, courtScore + 15.0);
             }
 
-            // Calculate Weighted Overall Score with Relevance Gating
-            double wFact = request.getFactWeight();
-            double wStat = request.getStatuteWeight();
-            double wDom = request.getDomainWeight();
-            double wCourt = request.getCourtWeight();
-            double wPrec = request.getPrecedentWeight();
-            double sumWeights = wFact + wStat + wDom + wCourt + wPrec;
-
             double landmarkBoost = lc.isLandmarkCase() ? 100.0 : (Math.min(100.0, lc.getCitationCount() * 10.0));
 
-            double overallScore;
+            double overallScore = (
+                    (factSim * wFact) +
+                    (statuteSim * wStat) +
+                    (domainScore * wDom) +
+                    (courtScore * wCourt) +
+                    (landmarkBoost * wPrec)
+            ) / sumWeights;
 
-            if (factSim == 0.0 && statuteSim == 0.0) {
-                // If completely unrelated domain or non-matching domain, score is 0
-                if (domainScore < 100.0) {
-                    overallScore = 0.0;
-                } else {
-                    // Same domain, but no specific fact/statute match: minimal domain baseline
-                    overallScore = 5.0;
-                }
-            } else if (domainScore == 0.0 && factSim < 15.0 && statuteSim < 20.0) {
-                // Different domain with negligible overlap is filtered out
-                overallScore = 0.0;
-            } else {
-                // Relevant match: apply full weighted formula
-                overallScore = (
-                        (factSim * wFact) +
-                        (statuteSim * wStat) +
-                        (domainScore * wDom) +
-                        (courtScore * wCourt) +
-                        (landmarkBoost * wPrec)
-                ) / sumWeights;
-            }
-
-            // Only consider authorities that have genuine relevance (score > 0.0)
             if (overallScore > 0.0) {
-                // Determine if binding on target court
                 boolean isBinding = isBindingPrecedent(lc.getCourtLevel(), request.getTargetCourtLevel());
-
                 String rationale = generateMatchRationale(lc, factSim, statuteSim, effectiveDomain, request);
                 String takeaway = extractTakeaway(lc);
 
@@ -181,6 +188,86 @@ public class RecommendationService {
                         takeaway,
                         isBinding
                 ));
+            }
+        }
+
+        // 2. If insufficient matching precedents in local DB, dynamically search and ingest live CourtListener opinions
+        if (matches.size() < request.getTopK()) {
+            try {
+                CourtListenerService cls = courtListenerServiceProvider.getIfAvailable();
+                if (cls != null) {
+                    String searchKeywords = request.getFactsSynopsis();
+                    if (searchKeywords != null && !searchKeywords.isBlank()) {
+                        String queryForApi = searchKeywords.trim();
+                        if (queryForApi.contains(".")) {
+                            queryForApi = queryForApi.substring(0, queryForApi.indexOf('.')).trim();
+                        }
+                        if (queryForApi.length() > 80) {
+                            queryForApi = queryForApi.substring(0, 80).trim();
+                        }
+
+                        CourtListenerSearchResponse apiResponse = cls.searchOpinions(queryForApi, 1);
+                        if (apiResponse != null && apiResponse.getResults() != null) {
+                            for (CourtListenerDTO dto : apiResponse.getResults()) {
+                                if (matches.size() >= request.getTopK() * 2) break;
+                                try {
+                                    LegalCase imported = cls.importCase(dto);
+                                    if (imported != null && imported.getId() != null) {
+                                        indexCase(imported);
+                                        Map<String, Double> caseVector = caseVectorsCache.get(imported.getId());
+                                        if (caseVector == null) {
+                                            caseVector = vectorizer.vectorize(buildCaseSearchableText(imported), idfCache);
+                                            caseVectorsCache.put(imported.getId(), caseVector);
+                                        }
+
+                                        double factSim = vectorizer.cosineSimilarity(queryVector, caseVector) * 100.0;
+                                        double statuteSim = vectorizer.computeStatuteOverlap(request.getStatutes(), imported.getStatutesCited()) * 100.0;
+
+                                        // Only add if there is actual relevance
+                                        if (factSim > 0.0 || statuteSim > 0.0) {
+                                            double domainScore = (effectiveDomain != null && effectiveDomain == imported.getDomain()) ? 100.0 : 40.0;
+                                            double courtScore = (imported.getCourtLevel() != null ? imported.getCourtLevel().getPrecedentWeight() : 0.6) * 100.0;
+                                            if (imported.isLandmarkCase()) {
+                                                courtScore = Math.min(100.0, courtScore + 15.0);
+                                            }
+                                            double landmarkBoost = imported.isLandmarkCase() ? 100.0 : Math.min(100.0, imported.getCitationCount() * 10.0);
+
+                                            double overallScore = (
+                                                    (factSim * wFact) +
+                                                    (statuteSim * wStat) +
+                                                    (domainScore * wDom) +
+                                                    (courtScore * wCourt) +
+                                                    (landmarkBoost * wPrec)
+                                            ) / sumWeights;
+
+                                            boolean alreadyAdded = matches.stream().anyMatch(m -> m.getLegalCase().getId().equals(imported.getId()));
+                                            if (!alreadyAdded && overallScore > 0.0) {
+                                                boolean isBinding = isBindingPrecedent(imported.getCourtLevel(), request.getTargetCourtLevel());
+                                                String rationale = generateMatchRationale(imported, factSim, statuteSim, effectiveDomain, request);
+                                                String takeaway = extractTakeaway(imported);
+                                                matches.add(new MatchedPrecedent(
+                                                        imported,
+                                                        Math.round(overallScore * 10.0) / 10.0,
+                                                        Math.round(factSim * 10.0) / 10.0,
+                                                        Math.round(statuteSim * 10.0) / 10.0,
+                                                        Math.round(domainScore * 10.0) / 10.0,
+                                                        Math.round(courtScore * 10.0) / 10.0,
+                                                        rationale,
+                                                        takeaway,
+                                                        isBinding
+                                                ));
+                                            }
+                                        }
+                                    }
+                                } catch (Exception ex) {
+                                    log.debug("Could not process candidate CourtListener opinion: {}", ex.getMessage());
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("CourtListener auto-query fallback encountered: {}", e.getMessage());
             }
         }
 
@@ -199,8 +286,8 @@ public class RecommendationService {
         List<String> statutesToCite = generateStatutesToCite(request, topPrecedents);
         List<String> riskFactors = generateRiskFactors(prediction, topPrecedents);
 
-        String summary = String.format("AI evaluated %d repository cases. Identified %d high-affinity precedents with average match confidence of %.1f%%.",
-                allCases.size(), topPrecedents.size(),
+        String summary = String.format("AI evaluated %d active cases (including CourtListener authorities). Identified %d high-affinity precedents with average match confidence of %.1f%%.",
+                caseRepository.count(), topPrecedents.size(),
                 topPrecedents.stream().mapToDouble(MatchedPrecedent::getOverallScore).average().orElse(0.0));
 
         RecommendationResult result = new RecommendationResult(
